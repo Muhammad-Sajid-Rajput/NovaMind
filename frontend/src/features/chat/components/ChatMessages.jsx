@@ -190,7 +190,7 @@ function ChatMessages() {
         style={{ overscrollBehaviorY: 'contain' }}
       >
         {/* Top spacer */}
-        <div className="h-4 flex-shrink-0" />
+        <div className="h-4 shrink-0" />
 
         {/* Welcome screen */}
         {!hasMessages && <WelcomeScreen />}
@@ -206,7 +206,7 @@ function ChatMessages() {
         )}
 
         {/* Bottom spacer */}
-        <div ref={bottomRef} className="h-12 flex-shrink-0" />
+        <div ref={bottomRef} className="h-12 shrink-0" />
       </div>
 
       {/* Jump to latest button */}

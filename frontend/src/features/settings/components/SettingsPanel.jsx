@@ -293,7 +293,7 @@ function SettingsPanel() {
       <div className="fixed inset-0 bg-black/60 backdrop-blur-[3px]" aria-hidden="true" />
 
       <div
-        className="z-61 modal-appear p-6 shadow-2xl flex flex-col gap-4 overflow-hidden transition-all duration-200 ease-out fixed inset-0 rounded-none w-full h-full max-w-none max-h-none sm:relative sm:inset-auto sm:rounded-2xl sm:w-full sm:max-w-[800px] sm:max-h-[85vh] sm:h-[600px]"
+        className="z-61 modal-appear p-6 shadow-2xl flex flex-col gap-4 overflow-hidden transition-all duration-200 ease-out fixed inset-0 rounded-none w-full h-full max-w-none max-h-none sm:relative sm:inset-auto sm:rounded-2xl sm:w-full sm:max-w-200 sm:max-h-[85vh] sm:h-150"
         style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -323,7 +323,7 @@ function SettingsPanel() {
         <div className="flex-1 flex flex-col sm:flex-row overflow-hidden min-h-0 gap-4 sm:gap-0">
           
           {/* Navigation Sidebar */}
-          <div className="w-full sm:w-[220px] shrink-0 flex flex-row sm:flex-col gap-1 border-b sm:border-b-0 sm:border-r pb-3 sm:pb-0 sm:pr-4" style={{ borderColor: "var(--color-border)" }}>
+          <div className="w-full sm:w-55 shrink-0 flex flex-row sm:flex-col gap-1 border-b sm:border-b-0 sm:border-r pb-3 sm:pb-0 sm:pr-4" style={{ borderColor: "var(--color-border)" }}>
             <button
               className={`flex-1 sm:flex-initial flex items-center justify-center sm:justify-start gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all border-none cursor-pointer text-left ${
                 activeTab === "general"
@@ -700,7 +700,7 @@ function SettingsPanel() {
                 )}
 
                 {/* Memories List */}
-                <div className="flex flex-col gap-2 max-h-[350px] overflow-y-auto scrollbar-thin pr-1">
+                <div className="flex flex-col gap-2 max-h-87.5 overflow-y-auto scrollbar-thin pr-1">
                   {memoriesLoading && (
                     <div className="flex items-center gap-2 py-6 text-xs text-text-muted justify-center">
                       <Icon icon="line-md:loading-twotone-loop" className="animate-spin text-base" />
@@ -713,7 +713,7 @@ function SettingsPanel() {
                   {!memoriesLoading && !memoryError && memories.length === 0 && (
                     <div className="text-center py-8 px-4 border border-dashed rounded-2xl" style={{ borderColor: "var(--color-border)" }}>
                       <Icon icon="material-symbols:brain-menu-rounded" className="text-4xl text-text-muted mb-2 opacity-40 mx-auto" />
-                      <p className="text-xs text-text-muted max-w-[280px] mx-auto leading-relaxed">
+                      <p className="text-xs text-text-muted max-w-70 mx-auto leading-relaxed">
                         No memories yet. Start chatting and NovaMind will automatically remember things about you.
                       </p>
                     </div>

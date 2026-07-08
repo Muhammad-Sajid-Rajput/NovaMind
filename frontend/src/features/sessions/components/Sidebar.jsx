@@ -131,7 +131,7 @@ function Sidebar() {
       <aside
         role="complementary"
         aria-label="Sidebar navigation"
-        className={`fixed lg:relative top-0 bottom-0 left-0 w-[85vw] max-w-[320px] lg:w-[260px] bg-sidebar border-r z-50 lg:z-auto flex flex-col h-full transition-transform duration-250 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        className={`fixed lg:relative top-0 bottom-0 left-0 w-[85vw] max-w-[320px] lg:w-65 bg-sidebar border-r z-50 lg:z-auto flex flex-col h-full transition-transform duration-250 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         style={{ borderColor: "var(--color-border)", height: "100vh", maxHeight: "100vh" }}
       >
@@ -140,7 +140,7 @@ function Sidebar() {
           {!isSearchActive ? (
             <div className="flex items-center justify-between">
               {/* Logo */}
-              <div className="flex items-center font-serif font-semibold text-text-primary text-xl select-none font-medium">
+              <div className="flex items-center font-serif font-semibold text-text-primary text-xl select-none">
                 <span>NovaMind</span>
               </div>
 
@@ -197,7 +197,7 @@ function Sidebar() {
               </div>
 
               {/* Status line */}
-              <div className="text-[11px] font-semibold px-1 select-none min-h-[16px]" style={{ color: "var(--color-text-secondary)" }}>
+              <div className="text-[11px] font-semibold px-1 select-none min-h-4" style={{ color: "var(--color-text-secondary)" }}>
                 {searchLoading && "Searching..."}
                 {!searchLoading && searchError && <span className="text-error">{searchError}</span>}
                 {!searchLoading && !searchError && searchResults !== null && (
@@ -213,7 +213,7 @@ function Sidebar() {
 
         {/* New chat row — only visible when not searching */}
         {!isSearchActive && (
-          <div className="px-3 pb-3 flex-shrink-0">
+          <div className="px-3 pb-3 shrink-0">
             <button
               onClick={() => {
                 navigate("/new");
@@ -246,7 +246,7 @@ function Sidebar() {
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <Icon
                       icon={result.sender === "user" ? "material-symbols:person-outline" : "material-symbols:smart-toy-outline"}
-                      className="text-xs text-text-muted flex-shrink-0"
+                      className="text-xs text-text-muted shrink-0"
                     />
                     <span className="text-[10px] font-semibold text-primary/80 truncate flex-1">
                       <HighlightedText text={result.sessionName} query={searchQuery} />
@@ -275,7 +275,7 @@ function Sidebar() {
         </div>
 
         {/* Sidebar Footer */}
-        <div className="hidden lg:block flex-shrink-0">
+        <div className="hidden lg:block shrink-0">
           <SidebarFooter />
         </div>
       </aside>

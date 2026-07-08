@@ -20,7 +20,7 @@ function ChatHeader() {
 
   return (
     <header
-      className="h-[52px] flex items-center justify-between px-3 z-30 transition-colors duration-300 relative"
+      className="h-13 flex items-center justify-between px-3 z-30 transition-colors duration-300 relative"
       style={{
         backgroundColor: "var(--color-background)",
         borderBottom: "1px solid var(--color-border)"
@@ -38,7 +38,7 @@ function ChatHeader() {
         </button>
 
         {/* Current Session Title */}
-        <span className="font-sans font-medium text-text-primary text-sm select-none truncate max-w-[150px] sm:max-w-[200px] md:max-w-[300px] lg:text-base">
+        <span className="font-sans font-medium text-text-primary text-sm select-none truncate max-w-37.5 sm:max-w-50 md:max-w-75 lg:text-base">
           {sessionName}
         </span>
       </div>
@@ -46,7 +46,7 @@ function ChatHeader() {
       <div className="flex items-center gap-1.5">
         {/* Fullscreen Toggle Button — Desktop Only */}
         <button
-          className="w-9 h-9 flex items-center justify-center border-none bg-transparent hover:bg-surface-hover text-text-secondary hover:text-text-primary rounded-md cursor-pointer transition-colors duration-200 text-lg hidden lg:flex"
+          className="w-9 h-9 inline-flex items-center justify-center border-none bg-transparent hover:bg-surface-hover text-text-secondary hover:text-text-primary rounded-md cursor-pointer transition-colors duration-200 text-lg max-lg:hidden"
           onClick={toggleFullscreen}
           aria-label="Toggle Fullscreen"
           title="Toggle Fullscreen"

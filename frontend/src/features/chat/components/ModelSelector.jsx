@@ -31,7 +31,7 @@ function ModelSelector({ compact = false, dropdownPosition = "up" }) {
   return (
     <div className="relative" ref={dropdownRef}>
       <button
-        className={`flex items-center gap-1.5 bg-transparent hover:bg-surface border rounded-full text-text-secondary hover:text-text-primary transition-all duration-150 cursor-pointer font-medium border-none bg-transparent ${
+        className={`flex items-center gap-1.5 bg-transparent hover:bg-surface border rounded-full text-text-secondary hover:text-text-primary transition-all duration-150 cursor-pointer font-medium border-none ${
           compact ? "px-2.5 py-0.5 text-xs" : "px-3 py-1 text-sm"
         }`}
         style={{ borderColor: "var(--color-border)" }}

@@ -22,7 +22,7 @@ function ShortcutsModal({ onClose }) {
       <div
         className="modal-appear p-6 shadow-2xl flex flex-col gap-5 overflow-y-auto transition-transform duration-300 ease-out
           fixed inset-0 rounded-none w-full h-full max-w-none max-h-none
-          sm:relative sm:inset-auto sm:rounded-2xl sm:w-full sm:max-w-[480px] sm:max-h-[90vh] sm:h-auto"
+          sm:relative sm:inset-auto sm:rounded-2xl sm:w-full sm:max-w-120 sm:max-h-[90vh] sm:h-auto"
         style={{
           background: "var(--color-surface)",
           border: "1px solid var(--color-border)",

@@ -32,7 +32,7 @@ function WelcomeScreen() {
 
   return (
     <div className="absolute inset-0 z-10 flex flex-col items-center justify-center px-6 text-center select-none pointer-events-none">
-      <div className="w-full md:max-w-[760px] lg:max-w-[800px] xl:max-w-[840px] flex flex-col items-center justify-center pointer-events-auto">
+      <div className="w-full md:max-w-190 lg:max-w-200 xl:max-w-210 flex flex-col items-center justify-center pointer-events-auto">
         {/* Brand Banner */}
         <div className="flex items-center justify-center gap-4 sm:gap-6 mb-6 select-none animate-in fade-in duration-300">
           <img
@@ -74,7 +74,7 @@ function WelcomeScreen() {
         </h1>
 
         {/* Suggestion chips */}
-        <div className="flex flex-wrap sm:flex-nowrap justify-center gap-2.5 mt-6 max-w-[600px] sm:max-w-none w-full px-4 select-none">
+        <div className="flex flex-wrap sm:flex-nowrap justify-center gap-2.5 mt-6 max-w-150 sm:max-w-none w-full px-4 select-none">
           {chips.map((chip, index) => (
             <button
               key={chip.label}

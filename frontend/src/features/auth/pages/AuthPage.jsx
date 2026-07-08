@@ -35,7 +35,7 @@ function StrengthMeter({ password }) {
 
   return (
     <div className="pt-1.5">
-      <div className="flex gap-1 h-[4px] mb-1">
+      <div className="flex gap-1 h-1 mb-1">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className={`flex-1 rounded-full transition-colors duration-300 ${segmentColor(i)}`} />
         ))}
@@ -61,8 +61,8 @@ function Field({ id, label, type = "text", placeholder, value, onChange, error, 
           placeholder={placeholder}
           value={value}
           onChange={onChange}
-          className={`w-full h-10 px-3 ${rightSlot ? "pr-10" : ""} bg-[var(--bg-surface-hover)] border border-[var(--border)] rounded-lg text-sm font-semibold transition-all duration-200 focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none text-text-primary placeholder-[var(--text-muted)] ${
-            error ? "border-[var(--error)] focus:ring-[var(--error)]/20 focus:border-[var(--error)]" : ""
+          className={`w-full h-10 px-3 ${rightSlot ? "pr-10" : ""} bg-(--bg-surface-hover) border border-(--border) rounded-lg text-sm font-semibold transition-all duration-200 focus:ring-2 focus:ring-(--accent)/20 focus:border-(--accent) outline-none text-text-primary placeholder-(--text-muted) ${
+            error ? "border-(--error) focus:ring-(--error)/20 focus:border-(--error)" : ""
           }`}
         />
         {rightSlot}
@@ -77,7 +77,7 @@ function EyeButton({ show, onToggle }) {
   return (
     <button type="button" onClick={onToggle} tabIndex={-1}
       className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors bg-transparent border-none cursor-pointer flex items-center p-0 ${
-        show ? "text-[var(--accent-soft)]" : "text-text-secondary hover:text-text-primary"
+        show ? "text-(--accent-soft)" : "text-text-secondary hover:text-text-primary"
       }`}>
       <Icon icon={show ? "material-symbols:visibility-off-outline" : "material-symbols:visibility-outline"} className="text-[20px]" />
     </button>
@@ -101,7 +101,7 @@ function SubmitButton({ loading, label, loadingLabel, fullWidth = true }) {
     <button
       type="submit"
       disabled={loading}
-      className={`${fullWidth ? "w-full" : "flex-1"} h-[42px] text-white font-bold rounded-lg flex items-center justify-center gap-2 transition-all duration-300 active:scale-[0.98] text-sm border-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
+      className={`${fullWidth ? "w-full" : "flex-1"} h-10.5 text-white font-bold rounded-lg flex items-center justify-center gap-2 transition-all duration-300 active:scale-[0.98] text-sm border-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
       style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-soft))", boxShadow: "0 4px 15px rgba(124, 58, 237, 0.35)" }}
     >
       {loading ? (<><Icon icon="material-symbols:progress-activity" className="animate-spin" />{loadingLabel}</>) : label}
@@ -124,12 +124,12 @@ function AuthCard({ children }) {
 
       {/* Card */}
       <div
-        className="w-full max-w-4xl flex rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden border border-[var(--border)]"
+        className="w-full max-w-4xl flex rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden border border-(--border)"
         style={{ minHeight: "460px", maxHeight: "min(600px, 90vh)", background: "var(--bg-surface)" }}
       >
         {/* Left — image */}
-        <div className="hidden lg:flex lg:w-1/2 bg-cover bg-center relative flex-shrink-0" style={{ backgroundImage: `url(${authBg})` }}>
-          <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-surface)]/90 via-transparent to-transparent" />
+        <div className="hidden lg:flex lg:w-1/2 bg-cover bg-center relative shrink-0" style={{ backgroundImage: `url(${authBg})` }}>
+          <div className="absolute inset-0 bg-linear-to-t from-(--bg-surface)/90 via-transparent to-transparent" />
         </div>
 
         {/* Right — form */}
@@ -186,7 +186,7 @@ function OtpStep({ email, onSuccess, onBack, stepLabel }) {
   };
 
   return (
-    <div className="w-full max-w-[340px] flex flex-col">
+    <div className="w-full max-w-85 flex flex-col">
       {stepLabel && <StepBadge current={stepLabel.current} total={stepLabel.total} />}
       <h2 className="text-xl font-extrabold text-white mb-2 tracking-tight text-center">Check your email</h2>
       <p className="text-xs font-semibold mb-5 leading-relaxed text-center" style={{ color: "var(--text-secondary)" }}>
@@ -205,7 +205,7 @@ function OtpStep({ email, onSuccess, onBack, stepLabel }) {
             placeholder="123456"
             value={code}
             onChange={(e) => { setCode(e.target.value.replace(/\D/g, "")); setError(""); }}
-            className="w-full h-11 text-center tracking-[0.5em] text-lg bg-[var(--bg-surface-hover)] border border-[var(--border)] rounded-lg px-3 outline-none transition-all duration-200 focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] font-bold text-text-primary"
+            className="w-full h-11 text-center tracking-[0.5em] text-lg bg-(--bg-surface-hover) border border-(--border) rounded-lg px-3 outline-none transition-all duration-200 focus:ring-2 focus:ring-(--accent)/20 focus:border-(--accent) font-bold text-text-primary"
           />
         </div>
 
@@ -215,7 +215,7 @@ function OtpStep({ email, onSuccess, onBack, stepLabel }) {
         <div className="flex items-center gap-3 mt-4">
           {onBack && (
             <button type="button" onClick={onBack}
-              className="w-[90px] h-[42px] border font-bold rounded-lg hover:bg-[var(--accent-tint)] transition-all text-sm cursor-pointer"
+              className="w-22.5 h-10.5 border font-bold rounded-lg hover:bg-(--accent-tint) transition-all text-sm cursor-pointer"
               style={{ borderColor: "var(--border-focus)", color: "var(--text-secondary)" }}>
               Back
             </button>
@@ -281,7 +281,7 @@ function LoginForm({ onSwitchToRegister, onSwitchToForgotPassword }) {
   }
 
   return (
-    <div className="w-full max-w-[340px] flex flex-col">
+    <div className="w-full max-w-85 flex flex-col">
       <h2 className="text-xl font-extrabold text-text-primary mb-5 tracking-tight text-center">
         Sign in to your account
       </h2>
@@ -349,7 +349,7 @@ function ForgotPasswordForm({ onSwitchToLogin, onResetRequested }) {
   };
 
   return (
-    <div className="w-full max-w-[340px] flex flex-col">
+    <div className="w-full max-w-85 flex flex-col">
       <h2 className="text-xl font-extrabold text-text-primary mb-2 tracking-tight text-center">
         Forgot Password
       </h2>
@@ -411,7 +411,7 @@ function VerifyResetCodeForm({ email, onBack, onVerified }) {
   };
 
   return (
-    <div className="w-full max-w-[340px] flex flex-col">
+    <div className="w-full max-w-85 flex flex-col">
       <h2 className="text-xl font-extrabold text-text-primary mb-2 tracking-tight text-center">
         Verify Code
       </h2>
@@ -431,7 +431,7 @@ function VerifyResetCodeForm({ email, onBack, onVerified }) {
             placeholder="123456"
             value={code}
             onChange={(e) => { setCode(e.target.value.replace(/\D/g, "")); setError(""); }}
-            className="w-full h-11 text-center tracking-[0.5em] text-lg bg-[var(--bg-surface-hover)] border border-[var(--border)] rounded-lg px-3 outline-none transition-all duration-200 focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] font-bold text-text-primary"
+            className="w-full h-11 text-center tracking-[0.5em] text-lg bg-(--bg-surface-hover) border border-(--border) rounded-lg px-3 outline-none transition-all duration-200 focus:ring-2 focus:ring-(--accent)/20 focus:border-(--accent) font-bold text-text-primary"
           />
         </div>
 
@@ -439,7 +439,7 @@ function VerifyResetCodeForm({ email, onBack, onVerified }) {
 
         <div className="flex items-center gap-3 mt-4">
           <button type="button" onClick={onBack}
-            className="w-[90px] h-[42px] border font-bold rounded-lg hover:bg-[var(--accent-tint)] transition-all text-sm cursor-pointer"
+            className="w-22.5 h-10.5 border font-bold rounded-lg hover:bg-(--accent-tint) transition-all text-sm cursor-pointer"
             style={{ borderColor: "var(--border-focus)", color: "var(--text-secondary)" }}>
             Back
           </button>
@@ -490,7 +490,7 @@ function ResetPasswordForm({ email, code, onSwitchToLogin }) {
   };
 
   return (
-    <div className="w-full max-w-[340px] flex flex-col">
+    <div className="w-full max-w-85 flex flex-col">
       <h2 className="text-xl font-extrabold text-text-primary mb-2 tracking-tight text-center">
         New Password
       </h2>
@@ -507,7 +507,7 @@ function ResetPasswordForm({ email, code, onSwitchToLogin }) {
             <input id="reset-password" type={showPassword ? "text" : "password"} placeholder="••••••••"
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError(""); }}
-              className="w-full h-10 px-3 pr-10 bg-[var(--bg-surface-hover)] border border-[var(--border)] rounded-lg text-sm font-semibold outline-none text-text-primary"
+              className="w-full h-10 px-3 pr-10 bg-(--bg-surface-hover) border border-(--border) rounded-lg text-sm font-semibold outline-none text-text-primary"
             />
             <EyeButton show={showPassword} onToggle={() => setShowPassword((v) => !v)} />
           </div>
@@ -590,7 +590,7 @@ function RegisterForm({ onSwitchToLogin }) {
   };
 
   return (
-    <div className="w-full max-w-[340px] flex flex-col">
+    <div className="w-full max-w-85 flex flex-col">
       {/* ── Step 1: Name + Email ── */}
       {step === 1 && (
         <>
@@ -605,7 +605,7 @@ function RegisterForm({ onSwitchToLogin }) {
             <ErrorMessage message={error} fullWidth onDismiss={() => setError("")} />
 
             <button type="submit"
-              className="w-full h-[42px] text-white font-bold rounded-lg flex items-center justify-center transition-all duration-300 active:scale-[0.98] mt-5 text-sm border-none cursor-pointer"
+              className="w-full h-10.5 text-white font-bold rounded-lg flex items-center justify-center transition-all duration-300 active:scale-[0.98] mt-5 text-sm border-none cursor-pointer"
               style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-soft))", boxShadow: "0 4px 15px var(--accent-tint)" }}>
               Continue
             </button>
@@ -633,7 +633,7 @@ function RegisterForm({ onSwitchToLogin }) {
                 <input id="reg-password" type={showPassword ? "text" : "password"} placeholder="••••••••"
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setError(""); }}
-                  className="w-full h-10 px-3 pr-10 bg-[var(--bg-surface-hover)] border border-[var(--border)] rounded-lg text-sm font-semibold outline-none text-text-primary"
+                  className="w-full h-10 px-3 pr-10 bg-(--bg-surface-hover) border border-(--border) rounded-lg text-sm font-semibold outline-none text-text-primary"
                 />
                 <EyeButton show={showPassword} onToggle={() => setShowPassword((v) => !v)} />
               </div>
@@ -647,7 +647,7 @@ function RegisterForm({ onSwitchToLogin }) {
 
             <div className="flex items-center gap-3 mt-5">
               <button type="button" onClick={() => setStep(1)}
-                className="w-[90px] h-[42px] border font-bold rounded-lg hover:bg-[var(--accent-tint)] transition-all text-sm cursor-pointer"
+                className="w-22.5 h-10.5 border font-bold rounded-lg hover:bg-(--accent-tint) transition-all text-sm cursor-pointer"
                 style={{ borderColor: "var(--border-focus)", color: "var(--text-secondary)" }}>
                 Back
               </button>

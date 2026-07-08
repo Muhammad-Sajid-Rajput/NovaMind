@@ -111,7 +111,7 @@ function SessionItem({ session, searchQuery = "" }) {
 
   return (
     <div
-      className={`sidebar-session-item group relative flex items-center gap-1.5 px-2 py-[9px] sm:py-1.5 rounded-lg cursor-pointer transition-colors duration-150 ${
+      className={`sidebar-session-item group relative flex items-center gap-1.5 px-2 py-2.25 sm:py-1.5 rounded-lg cursor-pointer transition-colors duration-150 ${
         isActive
           ? "active bg-surface text-text-primary"
           : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
@@ -153,7 +153,7 @@ function SessionItem({ session, searchQuery = "" }) {
       )}
 
       {!isEditing && (
-        <div className="relative flex-shrink-0" ref={menuRef}>
+        <div className="relative shrink-0" ref={menuRef}>
           <button
             className={`p-1.5 rounded-md transition-all duration-150 text-base flex items-center justify-center border-none bg-transparent opacity-100 sm:opacity-0 sm:group-hover:opacity-100 [@media(hover:none)]:opacity-100 ${
               menuOpen
@@ -173,7 +173,7 @@ function SessionItem({ session, searchQuery = "" }) {
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded-md transition-colors cursor-pointer border-none bg-transparent text-left"
                 onClick={handleRename}
               >
-                <Icon icon="material-symbols:edit-outline" className="text-base flex-shrink-0" />
+                <Icon icon="material-symbols:edit-outline" className="text-base shrink-0" />
                 Rename
               </button>
 
@@ -182,7 +182,7 @@ function SessionItem({ session, searchQuery = "" }) {
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-error hover:bg-error/10 rounded-md transition-colors cursor-pointer border-none bg-transparent text-left"
                 onClick={handleDeleteClick}
               >
-                <Icon icon="material-symbols:delete-outline" className="text-base flex-shrink-0" />
+                <Icon icon="material-symbols:delete-outline" className="text-base shrink-0" />
                 Delete
               </button>
             </div>
