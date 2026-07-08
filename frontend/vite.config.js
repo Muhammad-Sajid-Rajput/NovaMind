@@ -6,11 +6,27 @@ import { defineConfig } from 'vite';
 import react            from '@vitejs/plugin-react';
 import tailwindcss      from '@tailwindcss/vite';
 import { VitePWA }      from 'vite-plugin-pwa';
+import viteCompression  from 'vite-plugin-compression';
+import { visualizer }   from 'rollup-plugin-visualizer';
 
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    viteCompression({
+      algorithm: 'gzip',
+      ext: '.gz',
+    }),
+    viteCompression({
+      algorithm: 'brotliCompress',
+      ext: '.br',
+    }),
+    visualizer({
+      filename: 'stats.html',
+      open: false,
+      gzipSize: true,
+      brotliSize: true,
+    }),
 
     VitePWA({
       // 'autoUpdate' silently refreshes the service worker in the background
@@ -94,6 +110,30 @@ export default defineConfig({
       },
     }),
   ],
+
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react-dom') || id.includes('react-router') || id.includes('react-router-dom')) {
+              return 'framework';
+            }
+            if (id.includes('highlight.js')) {
+              return 'highlight';
+            }
+            if (id.includes('katex')) {
+              return 'katex';
+            }
+            if (id.includes('marked') || id.includes('dompurify')) {
+              return 'markdown-parser';
+            }
+            return 'vendor';
+          }
+        }
+      }
+    }
+  },
 
   server: {
     proxy: {

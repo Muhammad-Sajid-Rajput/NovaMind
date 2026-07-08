@@ -12,7 +12,10 @@ export default function AuthLayout() {
   if (isLoading) return null;
 
   // Already logged in — send to chat
-  if (user) return <Navigate to="/chat" replace />;
+  if (user) {
+    import("../../chat/pages/ChatPage.jsx").catch(() => {});
+    return <Navigate to="/chat" replace />;
+  }
 
   return (
     <div className="min-h-screen w-screen flex items-center justify-center bg-background p-4">

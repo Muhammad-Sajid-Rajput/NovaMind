@@ -1,15 +1,12 @@
 // NovaMind — ChatMessage.jsx — Scroll Bug Fix
-import hljs from "highlight.js";
-import "highlight.js/styles/github-dark.min.css";
-import DOMPurify from "dompurify";
-
-import { memo } from "react";
+import { memo, lazy, Suspense } from "react";
 import { Icon } from "@iconify/react";
-import { marked, Renderer } from "marked";
 import { useChatContext } from "../context/ChatContext.jsx";
 import MessageActions from "./MessageActions.jsx";
 import EditMessageBox from "./EditMessageBox.jsx";
 import VersionNavigator from "./VersionNavigator.jsx";
+
+const MarkdownRenderer = lazy(() => import("./MarkdownRenderer.jsx"));
 
 const FILE_ICONS = {
   pdf:  { icon: 'vscode-icons:file-type-pdf2',       color: '#f87171' },
@@ -39,49 +36,6 @@ const formatBytes = (bytes) => {
   return `${(bytes/1024/1024).toFixed(1)} MB`;
 };
 
-// Custom renderer for code blocks
-const renderer = new Renderer();
-
-renderer.code = (codeOrObj, info) => {
-  // Handle both marked v9+ (object arg) and older (string args)
-  let code = "";
-  let lang = "";
-  if (codeOrObj && typeof codeOrObj === "object") {
-    code = codeOrObj.text || "";
-    lang = codeOrObj.lang || "";
-  } else {
-    code = codeOrObj || "";
-    lang = info || "";
-  }
-  const displayLang = lang || "plaintext";
-  const validLang = hljs.getLanguage(displayLang) ? displayLang : "plaintext";
-  const highlighted = hljs.highlight(code, { language: validLang }).value;
-
-  return `
-    <div class="code-block-wrapper">
-      <div class="code-block-header">
-        <span class="code-lang">${displayLang}</span>
-        <button
-          class="copy-code-btn"
-          data-code="${encodeURIComponent(code)}"
-        >
-          Copy
-        </button>
-      </div>
-      <pre><code class="hljs language-${displayLang}">${highlighted}</code></pre>
-    </div>
-  `;
-};
-
-// FIX 4: Single marked.use() call — merges renderer + options.
-// Previously setOptions was called twice; the second call silently overwrote
-// the first (losing breaks, gfm, and highlight settings).
-marked.use({
-  renderer,
-  breaks: true,
-  gfm: true,
-});
-
 function ChatMessage({
   id,
   message,
@@ -103,36 +57,6 @@ function ChatMessage({
 }) {
   const { searchQuery, editingMessageId, setEditingMessageId } = useChatContext();
   const isEditing = id === editingMessageId;
-
-
-  function getBotMarkdownHtml() {
-    let cleanText = message || "";
-
-    if (searchQuery && searchQuery.trim() !== "") {
-      const escapedQuery = searchQuery.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
-      const regex = new RegExp(`(${escapedQuery})`, "gi");
-      cleanText = cleanText.replace(regex, `<mark class="search-highlight">$1</mark>`);
-    }
-
-    let rawHtml = marked.parse(cleanText);
-    
-    // Wrap tables in responsive container for scrolling and styling
-    rawHtml = rawHtml.replace(/<table>/g, '<div class="table-container"><table>').replace(/<\/table>/g, '</table></div>');
-
-    return DOMPurify.sanitize(rawHtml, {
-      ALLOWED_TAGS: [
-        "p", "br", "strong", "em", "code", "pre",
-        "ul", "ol", "li", "blockquote", "h1", "h2",
-        "h3", "h4", "h5", "h6", "a", "span", "div",
-        "table", "thead", "tbody", "tr", "th", "td",
-        "hr", "mark",
-      ],
-      ALLOWED_ATTR: [
-        "href", "class", "data-code", "target", "rel", "aria-hidden"
-      ],
-      ALLOW_DATA_ATTR: true,
-    });
-  }
 
   function renderUserText() {
     if (!searchQuery || searchQuery.trim() === "") {
@@ -344,13 +268,6 @@ function ChatMessage({
     <div
       className="w-full flex flex-col my-6 gap-2 items-start group relative max-w-180 mx-auto animate-in fade-in duration-200"
     >
-      <img
-        src="/favicon.webp"
-        alt="NovaMind Logo"
-        className="w-9 h-9 shrink-0 select-none object-contain rounded-md"
-        aria-hidden="true"
-      />
-
       <div className="flex-1 flex flex-col gap-1.5 min-w-0">
         {isError && (
           <div className="flex items-center gap-2 text-xs font-semibold text-accent-red select-none mb-1" role="alert">
@@ -371,7 +288,9 @@ function ChatMessage({
               isError ? "text-accent-red font-medium" : ""
             } ${isStreaming ? "streaming" : ""}`}
           >
-            <div className="bot-markdown" dangerouslySetInnerHTML={{ __html: getBotMarkdownHtml() }} />
+            <Suspense fallback={<div className="text-text-muted text-sm py-1">Formatting response...</div>}>
+              <MarkdownRenderer text={message} searchQuery={searchQuery} isStreaming={isStreaming} />
+            </Suspense>
             {isStreaming && (
               <span className="cursor-blink inline-block align-middle ml-1" aria-hidden="true">▋</span>
             )}

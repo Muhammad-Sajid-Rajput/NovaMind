@@ -175,6 +175,10 @@ body {
   color: var(--color-text-primary);
 }
 
+.bot-markdown > :first-child {
+  margin-top: 0 !important;
+}
+
 .bot-markdown p {
   margin-bottom: 12px;
 }

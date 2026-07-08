@@ -96,6 +96,12 @@ export const deleteFileVectors = async (fileId, userId) => {
   logger.info('Deleted file vectors', { fileId, userId });
 };
 
+// ── Delete vectors for a file by hash ──────────────
+export const deleteFileVectorsByHash = async (sha256, userId) => {
+  await deleteByFilter({ sha256, userId });
+  logger.info('Deleted file vectors by hash', { sha256, userId });
+};
+
 // ── Delete vectors for a message/attachment ────────
 export const deleteMessageVectors = async (messageId, userId) => {
   await deleteByFilter({ messageId, userId });

@@ -224,7 +224,7 @@ const processIngestJob = async (job) => {
       status: 'indexed'
     });
 
-    await updateRegistryStatus('Completed');
+    await updateRegistryStatus('Completed', { documentId });
     await job.updateProgress(100);
 
     return {

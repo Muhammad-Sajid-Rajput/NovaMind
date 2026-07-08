@@ -4,8 +4,10 @@ import cloudinary from '../../core/config/cloudinary.js';
 import { addIngestJob, ingestQueue } from './queues/ingestQueue.js';
 import { asyncHandler } from '../../core/utils/asyncHandler.js';
 import { logger } from '../../core/utils/logger.js';
-import { deleteMessageVectors } from '../../core/services/pineconeService.js';
+import { deleteMessageVectors, deleteFileVectorsByHash } from '../../core/services/pineconeService.js';
 import FileRegistry from './models/FileRegistry.model.js';
+import DocumentChunk from './models/DocumentChunk.model.js';
+import DocumentManifest from './models/DocumentManifest.model.js';
 
 // GET /api/upload/signature
 // Returns signed parameters for Cloudinary direct client-side upload.
@@ -219,6 +221,15 @@ export const cancelUpload = asyncHandler(async (req, res) => {
 
   logger.info('Cancelling upload and cleaning up assets', { publicId, messageId });
 
+  let registry = null;
+  if (publicId) {
+    try {
+      registry = await FileRegistry.findOne({ publicId, userId });
+    } catch (err) {
+      logger.error('Failed to look up FileRegistry record during cancel', { publicId, error: err.message });
+    }
+  }
+
   // 1. Delete from Cloudinary if publicId exists
   if (publicId) {
     try {
@@ -228,7 +239,7 @@ export const cancelUpload = asyncHandler(async (req, res) => {
     }
   }
 
-  // 2. Delete vectors from Pinecone if messageId exists
+  // 2. Delete vectors from Pinecone
   if (messageId) {
     try {
       await deleteMessageVectors(messageId, userId.toString());
@@ -236,6 +247,77 @@ export const cancelUpload = asyncHandler(async (req, res) => {
       logger.error('Failed to delete Pinecone vectors during cancel', { messageId, error: err.message });
     }
   }
+  if (registry && registry.sha256 && registry.sha256 !== 'pending') {
+    try {
+      await deleteFileVectorsByHash(registry.sha256, userId.toString());
+    } catch (err) {
+      logger.error('Failed to delete Pinecone vectors by hash during cancel', { sha256: registry.sha256, error: err.message });
+    }
+  }
+
+  // 3. Delete DocumentChunk and DocumentManifest
+  if (registry) {
+    try {
+      if (registry.documentId) {
+        await DocumentChunk.deleteMany({ documentId: registry.documentId });
+        await DocumentManifest.deleteOne({ documentId: registry.documentId });
+        logger.info('Deleted document chunks and manifest by documentId', { documentId: registry.documentId });
+      } else if (registry.sha256 && registry.sha256 !== 'pending') {
+        // Fallback: delete chunks by sessionId, userId, and hash
+        const sampleChunk = await DocumentChunk.findOne({
+          sessionId: registry.sessionId,
+          userId,
+          'metadata.sha256': registry.sha256
+        });
+        if (sampleChunk && sampleChunk.documentId) {
+          await DocumentChunk.deleteMany({ documentId: sampleChunk.documentId });
+          await DocumentManifest.deleteOne({ documentId: sampleChunk.documentId });
+          logger.info('Deleted document chunks and manifest via fallback documentId lookup', { documentId: sampleChunk.documentId });
+        } else {
+          await DocumentChunk.deleteMany({
+            sessionId: registry.sessionId,
+            userId,
+            'metadata.sha256': registry.sha256
+          });
+          await DocumentManifest.deleteOne({
+            sessionId: registry.sessionId,
+            title: registry.fileName
+          });
+        }
+      }
+    } catch (err) {
+      logger.error('Failed to delete document chunks or manifest during cancel', { error: err.message });
+    }
+  }
+
+  // 4. Delete the FileRegistry record itself
+  if (registry) {
+    try {
+      await FileRegistry.deleteOne({ _id: registry._id });
+      logger.info('Deleted FileRegistry record during cancel', { registryId: registry._id });
+    } catch (err) {
+      logger.error('Failed to delete FileRegistry record during cancel', { registryId: registry._id, error: err.message });
+    }
+  }
+
+  // 5. Cancel / remove the active BullMQ job if it's running (only if not completed/failed yet)
+  if (registry && registry.jobId) {
+    try {
+      const job = await ingestQueue.getJob(registry.jobId);
+      if (job) {
+        const state = await job.getState();
+        if (state === 'waiting' || state === 'active') {
+          await job.remove();
+          logger.info(`Removed active/waiting ingest job ${registry.jobId} from queue during cancel.`);
+        }
+      }
+    } catch (err) {
+      logger.warn('Failed to remove job from BullMQ queue during cancel', { jobId: registry.jobId, error: err.message });
+    }
+  }
+
+  // Note: Daily upload quota is NOT refunded on session/file deletion.
+  // Quota resets automatically after 24 hours.
 
   res.json({ success: true, message: 'Upload cancelled and assets cleaned up.' });
 });

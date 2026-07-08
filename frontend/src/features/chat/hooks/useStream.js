@@ -28,13 +28,13 @@ export function useStream({
   const [countdown, setCountdown] = useState(0);
   const abortControllerRef = useRef(null);
   const chunkBufferRef = useRef("");
-  const rafRef = useRef(null);
+  const timerRef = useRef(null);
 
-  // Cleanup RAF on unmount
+  // Cleanup throttled timer on unmount
   useEffect(() => {
     return () => {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
       }
     };
   }, []);
@@ -49,9 +49,9 @@ export function useStream({
   }, [countdown]);
 
   const stopGeneration = () => {
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
     chunkBufferRef.current = "";
     if (abortControllerRef.current) {
@@ -331,7 +331,7 @@ export function useStream({
 
     const flushBuffer = () => {
       if (!chunkBufferRef.current) {
-        rafRef.current = null;
+        timerRef.current = null;
         return;
       }
       const buffered = chunkBufferRef.current;
@@ -345,21 +345,21 @@ export function useStream({
           )
         };
       });
-      rafRef.current = null;
+      timerRef.current = null;
     };
 
     const onChunk = (chunk) => {
       streamedText += chunk;
       chunkBufferRef.current += chunk;
-      if (!rafRef.current) {
-        rafRef.current = requestAnimationFrame(flushBuffer);
+      if (!timerRef.current) {
+        timerRef.current = setTimeout(flushBuffer, 80);
       }
     };
 
     const flushBufferSync = () => {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
       if (chunkBufferRef.current) {
         const buffered = chunkBufferRef.current;

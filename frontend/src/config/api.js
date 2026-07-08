@@ -193,6 +193,18 @@ export const api = {
     ingest:          (body)  => post("/upload/ingest", body),
     getIngestStatus: (jobId) => get(`/upload/ingest/${jobId}`),
     cancel:          (body)  => post("/upload/cancel", body),
+    cancelKeepalive: (body)  => {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      };
+      return fetch(`${BASE}/upload/cancel`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        keepalive: true,
+      }).catch((e) => console.error('cancelKeepalive failed:', e));
+    },
   },
   sessions: {
     list:   ()           => get("/sessions"),

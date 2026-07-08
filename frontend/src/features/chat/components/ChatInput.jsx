@@ -5,7 +5,7 @@ import { Icon } from "@iconify/react";
 import { useStream } from "../hooks/useStream.js";
 import { useVoiceInput } from "../hooks/useVoiceInput.js";
 import { useChatContext } from "../context/ChatContext.jsx";
-import { api } from "../../../config/api.js";
+import { api, getAccessToken } from "../../../config/api.js";
 import ModelSelector from "./ModelSelector.jsx";
 import ErrorMessage from "../../../core/components/ui/ErrorMessage.jsx";
 import FilePreview from "./FilePreview.jsx";
@@ -69,6 +69,7 @@ function ChatInput() {
 
   // ── Multiple Files state ─────────────────────────────────────────────────────
   const [attachedFiles,   setAttachedFiles]   = useState([]);
+  const [isCleaningUp,    setIsCleaningUp]    = useState(false);
 
   // ── Refs ─────────────────────────────────────────────────────────────────────
   const fileInputRef           = useRef(null);
@@ -84,6 +85,7 @@ function ChatInput() {
   const pollingIntervalsRef    = useRef({}); // { [fileId]: intervalId }
   const originalFilesMapRef    = useRef({}); // { [fileId]: File object }
   const tempMessageIdRef       = useRef(null);
+  const attachedFilesRef       = useRef([]);
 
   const charCount = inputText.length;
 
@@ -206,7 +208,12 @@ function ChatInput() {
     handleRemoveAllFiles();
   }, [currentSessionId]);
 
-  // Restore persisted upload on mount / session load
+  // Sync attachedFilesRef with state
+  useEffect(() => {
+    attachedFilesRef.current = attachedFiles;
+  }, [attachedFiles]);
+
+  // Clean up and discard any persisted pending uploads on mount / page load
   useEffect(() => {
     if (!currentSessionId || hasRestoredRef.current) return;
     hasRestoredRef.current = true;
@@ -221,20 +228,63 @@ function ChatInput() {
       return;
     }
 
-    if (stored.sessionId !== currentSessionId) { clearUploadStorage(); return; }
-
-    if (stored.messageId) tempMessageIdRef.current = stored.messageId;
-
-    if (Array.isArray(stored.attachedFiles)) {
-      setAttachedFiles(stored.attachedFiles);
-      // Resume polling for any document in progress
-      stored.attachedFiles.forEach(f => {
-        if (f.uploadState === 'uploading' && f.ingestJobId) {
-          setTimeout(() => startSingleIngestPolling(f.ingestJobId, f.id), 0);
+    if (stored.sessionId !== currentSessionId) {
+      clearUploadStorage();
+    } else if (Array.isArray(stored.attachedFiles) && stored.attachedFiles.length > 0) {
+      // Discard files, trigger cancellation on backend, and clear local storage
+      setIsCleaningUp(true);
+      const cleanups = stored.attachedFiles.map(async (f) => {
+        if (f.uploadedData && f.uploadedData.publicId) {
+          try {
+            await api.upload.cancel({
+              publicId:     f.uploadedData.publicId,
+              resourceType: f.uploadedData.resourceType,
+              messageId:    stored.messageId || null,
+            });
+          } catch (err) {
+            console.error('Failed to clean up pending file on mount:', err);
+          }
         }
+      });
+
+      Promise.all(cleanups).finally(() => {
+        setIsCleaningUp(false);
+        clearUploadStorage();
       });
     }
   }, [currentSessionId]);
+
+  // Handle tab close / refresh cleanup for currently attached files
+  useEffect(() => {
+    const handleUnloadCleanup = () => {
+      const filesToCancel = attachedFilesRef.current
+        .map(f => f.uploadedData)
+        .filter(Boolean)
+        .filter(data => data.publicId);
+
+      if (filesToCancel.length === 0) return;
+
+      filesToCancel.forEach(file => {
+        try {
+          api.upload.cancelKeepalive({
+            publicId:     file.publicId,
+            resourceType: file.resourceType,
+            messageId:    tempMessageIdRef.current || null,
+          });
+        } catch (err) {
+          console.error('Failed to dispatch keepalive cancel request:', err);
+        }
+      });
+
+      clearUploadStorage();
+    };
+
+    window.addEventListener('pagehide', handleUnloadCleanup);
+
+    return () => {
+      window.removeEventListener('pagehide', handleUnloadCleanup);
+    };
+  }, []);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -790,7 +840,8 @@ function ChatInput() {
   const canSend =
     (inputText.trim().length > 0 || attachedFiles.some(f => f.uploadState === 'done')) &&
     !isStreaming &&
-    !isAnyFileProcessing;
+    !isAnyFileProcessing &&
+    !isCleaningUp;
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -865,8 +916,8 @@ function ChatInput() {
             <button
               className="w-9 h-9 flex items-center justify-center bg-transparent border-none text-text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer rounded-lg text-xl"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isLoading || editingMessageId !== null || attachedFiles.length >= 2}
-              title={attachedFiles.length >= 2 ? "Maximum 2 files uploaded" : "Upload Attachment (Images, Documents)"}
+              disabled={isLoading || editingMessageId !== null || attachedFiles.length >= 2 || isCleaningUp}
+              title={isCleaningUp ? "Cleaning up previous session..." : attachedFiles.length >= 2 ? "Maximum 2 files uploaded" : "Upload Attachment (Images, Documents)"}
             >
               <Icon icon="material-symbols:attach-file" />
             </button>

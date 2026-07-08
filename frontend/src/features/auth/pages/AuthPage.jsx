@@ -163,6 +163,7 @@ function OtpStep({ email, onSuccess, onBack, stepLabel }) {
     setLoading(true);
     try {
       await verifyEmail(email, code.trim());
+      import("../../chat/pages/ChatPage.jsx").catch(() => {});
       onSuccess?.();
     } catch (err) {
       setError(err.message || "Incorrect OTP. Please check your email and try again.");
@@ -265,6 +266,7 @@ function LoginForm({ onSwitchToRegister, onSwitchToForgotPassword }) {
     setLoading(true);
     try {
       await login(email, password);
+      import("../../chat/pages/ChatPage.jsx").catch(() => {});
     } catch (err) {
       if (err.requiresVerification) {
         setUnverifiedEmail(err.email || email);

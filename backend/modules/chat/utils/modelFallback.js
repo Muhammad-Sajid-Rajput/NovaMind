@@ -87,22 +87,24 @@ const setCooldown = async (modelName, errorStatus) => {
 };
 
 // ── withRetry — unchanged from Phase 4 ────────────────────────────────────────
-export const withRetry = async (fn, retries = 3, delayMs = 1000) => {
+export const withRetry = async (fn, retries = 2, delayMs = 200) => {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       return await fn();
     } catch (err) {
       const status      = err.status || (err.response && err.response.status);
-      const isRetryable = status === 503 || status === 429;
+      const code        = err.code;
+      const isRetryable = [500, 502, 503, 504, 429].includes(status) ||
+                          ['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND'].includes(code);
       const isLast      = attempt === retries - 1;
 
       if (isRetryable && !isLast) {
-        const wait = status === 429 ? Math.max(500, delayMs / 2) : delayMs;
+        const wait = status === 429 ? Math.max(100, delayMs / 2) : delayMs;
         logger.warn(
-          `[Retry] Attempt ${attempt + 1}/${retries} failed (${status}). Retrying in ${wait}ms...`
+          `[Retry] Attempt ${attempt + 1}/${retries} failed (${status || code}). Retrying in ${wait}ms...`
         );
         await new Promise((r) => setTimeout(r, wait));
-        delayMs *= 2;
+        delayMs *= 1.5;
         continue;
       }
       throw err;
@@ -144,7 +146,7 @@ export const withFallback = async (fn, preferredModel) => {
     telemetry[name].attempts++;
 
     try {
-      const result = await withRetry(() => fn(name));
+      const result = await withRetry(() => fn(name), 2, 200);
       telemetry[name].successes++;
 
       if (name !== modelToUse) fallbackRequests++;

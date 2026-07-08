@@ -22,7 +22,6 @@ graph TD
         Vite[React SPA / Vite 8]
         PWA[PWA Service Worker]
         KaTeX[KaTeX Math Engine]
-        Virtuoso[React Virtuoso List]
     end
 
     subgraph Backend["Backend (Railway)"]
@@ -48,7 +47,6 @@ graph TD
     User -->|HTTPS| Vite
     Vite --> PWA
     Vite --> KaTeX
-    Vite --> Virtuoso
     Vite -->|REST / SSE| Express
     Express --> Pino
     Express --> Metrics
@@ -141,7 +139,7 @@ chatbot-project/
         │
         └── features/
             ├── auth/                # OTP registration & login screens
-            ├── chat/                # Message list (Virtuoso), streaming, file upload
+            ├── chat/                # Message list, streaming, file upload
             │   └── components/
             │       ├── ChatInput.jsx    # Upload orchestration + localStorage persistence
             │       └── FilePreview.jsx  # File card — uploading/retrying/done/failed states

@@ -8,6 +8,9 @@ import { logger } from "../../core/utils/logger.js";
 import crypto from "crypto";
 import Message from "../messages/Message.model.js";
 import Session from "./Session.model.js";
+import FileRegistry from "../upload/models/FileRegistry.model.js";
+import DocumentChunk from "../upload/models/DocumentChunk.model.js";
+import DocumentManifest from "../upload/models/DocumentManifest.model.js";
 
 const extractPublicId = (url) => {
   if (!url || typeof url !== 'string') return null;
@@ -91,6 +94,38 @@ export const deleteSession = asyncHandler(async (req, res) => {
     logger.warn('Failed to delete Pinecone vectors for session, continuing', { error: err.message, sessionId: id });
   }
 
+  // 3a. Delete all file registries, chunks, and manifests associated with this session
+  // Note: Daily upload quota is NOT refunded on session/file deletion.
+  try {
+    const registries = await FileRegistry.find({ sessionId: id, userId });
+    for (const reg of registries) {
+      if (reg.publicId) {
+        await deleteCloudinaryFile(reg.publicId, 'raw');
+      }
+      if (reg.documentId) {
+        await DocumentChunk.deleteMany({ documentId: reg.documentId });
+        await DocumentManifest.deleteOne({ documentId: reg.documentId });
+      } else if (reg.sha256 && reg.sha256 !== 'pending') {
+        const sampleChunk = await DocumentChunk.findOne({
+          sessionId: id,
+          userId,
+          'metadata.sha256': reg.sha256
+        });
+        if (sampleChunk && sampleChunk.documentId) {
+          await DocumentChunk.deleteMany({ documentId: sampleChunk.documentId });
+          await DocumentManifest.deleteOne({ documentId: sampleChunk.documentId });
+        } else {
+          await DocumentChunk.deleteMany({ sessionId: id, userId, 'metadata.sha256': reg.sha256 });
+          await DocumentManifest.deleteOne({ sessionId: id, title: reg.fileName });
+        }
+      }
+    }
+    await FileRegistry.deleteMany({ sessionId: id, userId });
+    logger.info(`Deleted file registries, chunks, and manifests associated with session ${id}`);
+  } catch (err) {
+    logger.warn('Failed to delete file registries / chunks for session, continuing', { error: err.message, sessionId: id });
+  }
+
   // 3b. Delete User Memories associated with this session
   try {
     const Memory = (await import("../memory/Memory.model.js")).default;
@@ -137,6 +172,36 @@ export const clearAllSessions = asyncHandler(async (req, res) => {
       await deleteUserVectors(userId.toString());
     } catch (err) {
       logger.warn('Failed to delete Pinecone vectors during clear all chats', { error: err.message, userId });
+    }
+
+    // 4b. Delete all user file registries, chunks, and manifests
+    try {
+      const registries = await FileRegistry.find({ userId });
+      for (const reg of registries) {
+        if (reg.publicId) {
+          await deleteCloudinaryFile(reg.publicId, 'raw');
+        }
+        if (reg.documentId) {
+          await DocumentChunk.deleteMany({ documentId: reg.documentId });
+          await DocumentManifest.deleteOne({ documentId: reg.documentId });
+        } else if (reg.sha256 && reg.sha256 !== 'pending') {
+          const sampleChunk = await DocumentChunk.findOne({
+            userId,
+            'metadata.sha256': reg.sha256
+          });
+          if (sampleChunk && sampleChunk.documentId) {
+            await DocumentChunk.deleteMany({ documentId: sampleChunk.documentId });
+            await DocumentManifest.deleteOne({ documentId: sampleChunk.documentId });
+          } else {
+            await DocumentChunk.deleteMany({ userId, 'metadata.sha256': reg.sha256 });
+            await DocumentManifest.deleteMany({ sessionId: reg.sessionId, title: reg.fileName });
+          }
+        }
+      }
+      await FileRegistry.deleteMany({ userId });
+      logger.info(`Deleted all file registries, chunks, and manifests for user ${userId}`);
+    } catch (err) {
+      logger.warn('Failed to delete file registries / chunks for user, continuing', { error: err.message, userId });
     }
 
     // 5. Delete all User Memories

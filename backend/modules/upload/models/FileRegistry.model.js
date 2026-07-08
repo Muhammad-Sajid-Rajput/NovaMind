@@ -67,6 +67,11 @@ const fileRegistrySchema = new mongoose.Schema(
       type: String,
       default: null,
       index: true
+    },
+    documentId: {
+      type: String,
+      default: null,
+      index: true
     }
   },
   { timestamps: true }

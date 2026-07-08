@@ -28,7 +28,7 @@ frontend/
         ├── auth/             # Login & OTP verification forms
         ├── sessions/         # Sidebar navigation + debounced session search
         ├── settings/         # Option sliders, model selector, user Memory UI
-        └── chat/             # Message list (Virtuoso), voice dictation, input tools
+        └── chat/             # Message list, voice dictation, input tools
             └── components/
                 ├── ChatInput.jsx    # Handles input, file selection & localStorage upload states
                 └── FilePreview.jsx  # Renders files with upload/retry progress states
