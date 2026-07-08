@@ -1,0 +1,64 @@
+# ─── Dependencies ─────────────────────────────────────────────────────────────
+node_modules/
+
+# ─── Production Builds ────────────────────────────────────────────────────────
+dist/
+dist-ssr/
+build/
+out/
+dev-dist/
+
+# ─── Environment Variables (Secret Keys) ──────────────────────────────────────
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+!.env.example
+
+# ─── Diagnostic Logs ─────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ─── Tooling and Cache ────────────────────────────────────────────────────────
+.npm/
+.eslintcache
+.vite/
+.cache/
+coverage/
+.parcel-cache/
+.next/
+.nuxt/
+
+# ─── Operating System & Editor Files ──────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.history/
+.pnp/
+.pnp.js
+
+# ─── Backups & Temp ───────────────────────────────────────────────────────────
+*.bak
+*.tmp
+*~
+Desktop.ini
+*.db
+dump/
+*.bson
+.gemini/
+.agents/
+

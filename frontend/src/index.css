@@ -1,0 +1,1175 @@
+/* NovaMind — index.css — Phase 5 */
+@import "tailwindcss";
+
+@keyframes errorAppear {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+:root {
+  /* ── Backgrounds ── */
+  --bg-primary:        #0f0f17;   /* main chat area */
+  --bg-sidebar:        #090910;   /* sidebar — noticeably darker */
+  --bg-surface:        #1a1a26;   /* cards, modals, panels */
+  --bg-surface-hover:  #24243a;   /* hover states */
+
+  /* ── User bubble ── */
+  --user-bubble:       #7c3aed;
+  --user-bubble-hover: #8b5cf6;
+
+  /* ── Text ── */
+  --text-primary:      #f0effe;   /* main text — purple-tinted white */
+  --text-secondary:    #b8b4d0;   /* labels, descriptions — brighter */
+  --text-muted:        #7a7594;   /* timestamps, placeholders — readable */
+
+  /* ── Borders ── */
+  --border:            #2e2e45;   /* subtle but visible dividers */
+  --border-focus:      #6d28d9;   /* focus ring — actual violet */
+
+  /* ── Accent ── */
+  --accent:            #7c3aed;
+  --accent-hover:      #8b5cf6;
+  --accent-tint:       #1e1030;
+  --accent-soft:       #a78bfa;
+
+  /* ── Status ── */
+  --success:           #10b981;
+  --error:             #f87171;
+  --warning:           #facc15;
+}
+
+/* ─── Tailwind CSS v4 Theme Configuration ────────────────────────────────────── */
+@theme {
+  --breakpoint-xs: 480px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Outfit', sans-serif;
+  --font-mono: 'Fira Code', 'Courier New', monospace;
+
+  --color-background: var(--bg-primary);
+  --color-sidebar: var(--bg-sidebar);
+  --color-surface: var(--bg-surface);
+  --color-surface-hover: var(--bg-surface-hover);
+  --color-user-bubble: var(--user-bubble);
+  --color-user-bubble-hover: var(--user-bubble-hover);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  --color-border: var(--border);
+  --color-border-focus: var(--border-focus);
+
+  --color-primary: var(--accent);
+  --color-primary-hover: var(--accent-hover);
+  --color-primary-light: var(--accent-tint);
+
+  --color-success: var(--success);
+  --color-error: var(--error);
+  --color-warning: var(--warning);
+
+  --color-accent-red: var(--error);
+  --color-accent-yellow: var(--warning);
+  --color-accent-green: var(--success);
+}
+
+/* ── Custom dark variant ── */
+@variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ─── Resets & Base Styles ─────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(124, 58, 237, 0.07) 1px,
+    transparent 0
+  );
+  background-size: 32px 32px;
+  color: var(--color-text-primary);
+  min-height: 100vh;
+  display: flex;
+  overflow: hidden;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ─── Keyboard Focus-Visible Outlines ───────────────────────────────────────── */
+*:focus-visible:not(.chat-textarea):not(textarea) {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+
+/* ─── Reduced Motion Compatibility ─────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─── Blinking Cursor for SSE Stream Bubble ─────────────────────────────────── */
+.streaming-cursor::after {
+  content: "▋";
+  color: var(--color-primary);
+  font-family: monospace;
+  margin-left: 2px;
+  animation: cursor-blink 0.8s step-end infinite;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+@keyframes cursor-blink {
+
+  from,
+  to {
+    opacity: 0
+  }
+
+  50% {
+    opacity: 1
+  }
+}
+
+@keyframes typing-bounce {
+
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+
+/* ─── Markdown Parser Rendering Overrides (.bot-markdown) ───────────────────── */
+.bot-markdown {
+  font-size: 15px;
+  line-height: 1.7;
+  word-break: break-word;
+  color: var(--color-text-primary);
+}
+
+.bot-markdown p {
+  margin-bottom: 12px;
+}
+
+.bot-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.bot-markdown strong {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.bot-markdown em {
+  font-style: italic;
+}
+
+/* Headings */
+.bot-markdown h1,
+.bot-markdown h2,
+.bot-markdown h3,
+.bot-markdown h4,
+.bot-markdown h5,
+.bot-markdown h6 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-top: 20px;
+  margin-bottom: 8px;
+}
+
+.bot-markdown h1 {
+  font-size: 1.35rem;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 6px;
+}
+
+.bot-markdown h2 {
+  font-size: 1.2rem;
+}
+
+.bot-markdown h3 {
+  font-size: 1.05rem;
+}
+
+/* Lists */
+.bot-markdown ul,
+.bot-markdown ol {
+  margin-bottom: 12px;
+  padding-left: 22px;
+}
+
+.bot-markdown ul {
+  list-style-type: disc;
+}
+
+.bot-markdown ol {
+  list-style-type: decimal;
+}
+
+.bot-markdown li {
+  margin-bottom: 5px;
+  line-height: 1.7;
+}
+
+/* Blockquotes */
+.bot-markdown blockquote {
+  border-left: 3px solid var(--color-primary);
+  padding: 8px 14px;
+  background-color: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-radius: 0 6px 6px 0;
+  margin: 14px 0;
+}
+
+/* Tables */
+.bot-markdown .table-container {
+  width: 100%;
+  overflow-x: auto;
+  margin: 18px 0;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  background: rgba(18, 18, 24, 0.4);
+}
+
+.bot-markdown table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.bot-markdown th,
+.bot-markdown td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.bot-markdown th:last-child,
+.bot-markdown td:last-child {
+  border-right: none;
+}
+
+.bot-markdown tr:last-child td {
+  border-bottom: none;
+}
+
+.bot-markdown th {
+  background-color: rgba(255, 255, 255, 0.03);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.bot-markdown tr:nth-child(even) td {
+  background-color: rgba(255, 255, 255, 0.015);
+}
+
+.bot-markdown tr:hover td {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Inline Backtick Code */
+.bot-markdown code {
+  font-family: var(--font-mono);
+  background-color: var(--color-surface);
+  color: var(--color-primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  word-break: break-all;
+  border: 1px solid var(--color-border);
+}
+
+/* ─── Highlight Search Text Matches ─────────────────────────────────────────── */
+.search-highlight {
+  background-color: var(--color-accent-yellow);
+  color: #000;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* ─── Session Item 3-dot Dropdown ───────────────────────────────────────────── */
+.session-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 140px;
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  animation: dropdown-in 0.1s ease;
+}
+
+@keyframes dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ─── Message Appear Animation ──────────────────────────────────────────────── */
+@keyframes msg-appear {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.msg-appear {
+  animation: msg-appear 0.2s ease forwards;
+}
+
+/* ─── Modal Appear ──────────────────────────────────────────────────────────── */
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.modal-appear {
+  animation: modal-in 0.15s ease forwards;
+}
+
+/* Remove any focus outline, border, or shadow on the chat textarea */
+textarea:focus,
+textarea:focus-visible,
+textarea:active,
+.chat-textarea:focus,
+.chat-textarea:focus-visible,
+.chat-textarea:active {
+  outline: none !important;
+  outline-width: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Placeholder styling for chat textarea & edit textarea */
+.chat-textarea::placeholder,
+.edit-textarea::placeholder {
+  color: var(--color-text-muted) !important;
+  opacity: 0.75 !important;
+}
+
+/* ─── Edit Mode Styling (Claude-style) ──────────────────────────────────────── */
+.edit-message-box {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.edit-textarea {
+  width: 100%;
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 15px;
+  font-family: var(--font-sans);
+  color: var(--color-text-primary);
+  outline: none;
+  resize: none;
+  min-height: 52px;
+  max-height: 300px;
+  overflow-y: auto;
+  transition: border-color 0.15s ease;
+}
+
+[data-theme="dark"] .edit-textarea {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.edit-textarea:focus {
+  border-color: var(--color-primary) !important;
+}
+
+.edit-cancel-btn {
+  height: 34px;
+  padding: 6px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.edit-cancel-btn:hover {
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-hover);
+}
+
+.edit-submit-btn {
+  height: 34px;
+  padding: 6px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+  background-color: var(--color-primary);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.edit-submit-btn:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+}
+
+.edit-submit-btn:disabled {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+/* Bot message markdown styles */
+.bot-message-content {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--color-text-primary);
+}
+
+.bot-message-content p {
+  margin-bottom: 12px;
+}
+
+.bot-message-content p:last-child {
+  margin-bottom: 0;
+}
+
+.bot-message-content strong {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.bot-message-content em {
+  font-style: italic;
+}
+
+.bot-message-content ul,
+.bot-message-content ol {
+  padding-left: 20px;
+  margin-bottom: 12px;
+}
+
+.bot-message-content li {
+  margin-bottom: 4px;
+}
+
+.bot-message-content h1,
+.bot-message-content h2,
+.bot-message-content h3 {
+  font-weight: 600;
+  margin: 16px 0 8px;
+  color: var(--color-text-primary);
+}
+
+.bot-message-content h1 {
+  font-size: 1.25rem;
+}
+
+.bot-message-content h2 {
+  font-size: 1.1rem;
+}
+
+.bot-message-content h3 {
+  font-size: 1rem;
+}
+
+.bot-message-content blockquote {
+  border-left: 3px solid var(--color-primary);
+  padding-left: 12px;
+  margin: 8px 0;
+  color: var(--color-text-secondary);
+}
+
+.bot-message-content code:not(pre code) {
+  background: rgba(124, 58, 237, 0.15);
+  color: var(--accent-soft);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.875em;
+  font-family: 'Fira Code', monospace;
+  border: 1px solid rgba(124, 58, 237, 0.2);
+}
+
+/* Code block wrapper */
+.code-block-wrapper {
+  margin: 12px 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  background: linear-gradient(90deg, #161b22 0%, #1c2128 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.code-lang {
+  font-size: 12px;
+  color: #8b949e;
+  font-family: 'Fira Code', monospace;
+  text-transform: lowercase;
+}
+
+.copy-code-btn {
+  font-size: 12px;
+  color: #8b949e;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.copy-code-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-primary);
+}
+
+.code-block-wrapper pre {
+  margin: 0;
+  padding: 16px;
+  background: #0d1117;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #e6edf3;
+  /* Readability for plaintext on dark background */
+}
+
+.code-block-wrapper code {
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: inherit;
+}
+
+/* Version Navigator Styling */
+.version-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  border-radius: 4px;
+  transition: all 0.15s;
+  border: none;
+  background: transparent;
+}
+
+.version-btn:not(:disabled):hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+/* ─── Smooth SSE Streaming Render Pipeline Styles ──────────────────────────── */
+
+.streaming-text {
+  display: inline;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--color-text-primary);
+}
+
+.cursor-blink {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  background: var(--color-primary);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  animation: cursorBlink 0.9s ease infinite;
+}
+
+@keyframes cursorBlink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
+}
+
+.bot-message-content {
+  display: flow-root;
+}
+.bot-message-content > :first-child { margin-top: 0 !important; }
+.bot-message-content > :last-child  { margin-bottom: 0 !important; }
+
+.bot-bubble.streaming {
+  min-height: 28px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor-blink {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* ─── Touch and Responsive Optimizations ────────────────────────────────────── */
+
+/* Prevent text selection on double-tap (mobile) */
+.sidebar-session-item,
+.suggestion-chip,
+.menu-row {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+/* Smooth momentum scroll on iOS */
+.messages-container,
+.sidebar-session-list,
+.modal-scroll-area {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Prevent pull-to-refresh on the chat area */
+.messages-container {
+  overscroll-behavior-y: contain;
+}
+
+/* Safe area insets for iPhone notch/home bar */
+.chat-input-area {
+  padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+}
+
+.sidebar-footer {
+  padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+}
+
+/* Minimum touch target size */
+button,
+[role="button"] {
+  min-width: 36px;
+  min-height: 36px;
+}
+
+/* Specific overrides for small custom buttons */
+.toggle-switch,
+.version-btn,
+.copy-code-btn {
+  min-width: unset !important;
+  min-height: unset !important;
+}
+
+/* Responsive font sizes */
+.chat-heading {
+  font-size: clamp(22px, 4vw, 28px);
+}
+
+.message-text {
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.sidebar-session-name {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.input-textarea {
+  font-size: 15px;
+}
+
+/* Use dvh (dynamic viewport height) for mobile */
+.app-container {
+  height: 100dvh;
+  height: 100vh;
+  height: calc(var(--vh, 1vh) * 100);
+}
+
+/* Input sticks to bottom above keyboard */
+.chat-input-area {
+  position: sticky;
+  bottom: 0;
+}
+
+/* ─── Toast Animations (Right-to-Left Slide) ────────────────────────────────── */
+@keyframes toast-slide-in {
+  from {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toast-slide-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+}
+
+.toast-enter {
+  animation: toast-slide-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.toast-exit {
+  animation: toast-slide-out 0.2s ease-in forwards;
+}
+
+/* ─── Typing Indicator Dots (#17) ───────────────────────────────────────────── */
+@keyframes bounce-dot {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}
+
+.typing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  animation: bounce-dot 1.3s ease-in-out infinite;
+}
+
+.typing-dot:nth-child(1) { animation-delay: 0s; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* ─── Premium Custom Scrollbars ────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 99px;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Firefox compatibility styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+/* ─── Settings Panel — Stream Toggle ────────────────────────────────────────── */
+.toggle-track {
+  width: 38px;
+  min-width: 38px;
+  max-width: 38px;
+  height: 22px;
+  min-height: 22px;
+  max-height: 22px;
+  padding: 2px;
+  box-sizing: border-box;
+  line-height: 0;
+  font-size: 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  border-radius: 9999px;
+  cursor: pointer;
+  outline: none;
+  border-width: 1px;
+  border-style: solid;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.toggle-thumb {
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  min-height: 16px;
+  border-radius: 9999px;
+  background: white;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+/* ─── Visual Polish Layer ─────────────────────────────────────────────────────── */
+
+/* 1. User bubble — gradient + depth shadow */
+.bg-user-bubble {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 55%, #5b21b6 100%) !important;
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.3);
+}
+
+/* 2. Input wrapper — premium focus glow */
+.chat-input-area > div:focus-within {
+  box-shadow:
+    0 0 0 3px rgba(124, 58, 237, 0.09),
+    0 8px 32px rgba(124, 58, 237, 0.13) !important;
+}
+
+/* 3. Send button — gradient + hover lift */
+.bg-primary.rounded-full {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9) !important;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);
+  transition: box-shadow 0.2s ease, transform 0.15s ease !important;
+}
+.bg-primary.rounded-full:hover {
+  box-shadow: 0 6px 22px rgba(124, 58, 237, 0.55) !important;
+  transform: translateY(-1px);
+}
+.bg-primary.rounded-full:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3) !important;
+}
+
+/* 4. Active session item — violet left-border highlight */
+.sidebar-session-item.active {
+  background: linear-gradient(
+    90deg,
+    rgba(124, 58, 237, 0.18) 0%,
+    rgba(124, 58, 237, 0.06) 100%
+  ) !important;
+  border-left: 2px solid rgba(124, 58, 237, 0.7);
+  padding-left: 6px !important;
+}
+
+/* 5. Scrollbar — violet tint */
+::-webkit-scrollbar-thumb {
+  background: rgba(124, 58, 237, 0.28);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 58, 237, 0.5);
+}
+
+/* 6. Bot bubble — subtle left accent line */
+.bot-bubble {
+  border-left: 2px solid rgba(124, 58, 237, 0.18);
+  padding-left: 14px;
+  transition: border-color 0.2s ease;
+}
+.bot-bubble:hover {
+  border-left-color: rgba(124, 58, 237, 0.45);
+}
+
+/* 7. Modal backdrop blur */
+.modal-backdrop {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.55) !important;
+}
+
+/* 8. Sidebar footer avatar ring */
+.sidebar-footer div[style*="var(--color-primary)"] {
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.3);
+  transition: box-shadow 0.2s ease;
+}
+.sidebar-footer:hover div[style*="var(--color-primary)"] {
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.5);
+}
+
+/* 9. Message timestamp — fade in on hover */
+.message-timestamp {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.message-wrapper:hover .message-timestamp,
+.group:hover .message-timestamp {
+  opacity: 1;
+}
+
+/* 10. Online / status dot pulse */
+.online-dot {
+  position: relative;
+}
+.online-dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.3);
+  animation: pulse-ring 2s ease infinite;
+}
+@keyframes pulse-ring {
+  0%   { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
+/* 11. Welcome screen logo glow */
+.welcome-logo-container {
+  position: relative;
+}
+.welcome-logo-container::before {
+  content: '';
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.28) 0%, transparent 70%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  filter: blur(20px);
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* 12. Autofill Style Overrides */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  transition: background-color 5000s ease-in-out 0s !important;
+  box-shadow: inset 0 0 0 50px var(--bg-surface-hover) !important;
+}
+
+/* 13. Native Momentum Scroll & Overscroll prevention */
+.messages-container-native {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* 14. Claude-style Media Upload UI keyframes & styles */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.chat-input-wrapper {
+  display:       flex;
+  flex-direction: column;
+  border:        1px solid var(--border);
+  border-radius: 16px;
+  background:    var(--bg-surface);
+  transition:    border-color 0.15s ease, box-shadow 0.15s ease;
+  overflow:      visible; /* allows X button to overflow */
+  position:      relative;
+}
+
+.chat-input-wrapper:focus-within {
+  border-color: rgba(124, 58, 237, 0.5);
+  box-shadow:   0 0 0 3px rgba(124, 58, 237, 0.08);
+}
+
+.chat-input-wrapper.is-glowing {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+}
+
+.chat-input-wrapper.has-error {
+  border-color: var(--error);
+}
+
+.chat-input-wrapper.is-dragging {
+  border-color: rgba(124, 58, 237, 0.8);
+  border-style: dashed;
+  background: rgba(124, 58, 237, 0.03);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   Phase 5 — KaTeX Math Rendering
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Block display math ($$...$$) */
+.katex-display {
+  display:    block;
+  margin:     0.75em 0;
+  text-align: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Inline math ($...$) */
+.katex {
+  font-size: 1.05em;
+}
+
+/* Fallback when KaTeX cannot parse expression */
+.katex-fallback {
+  font-family:      var(--font-mono);
+  background-color: rgba(124, 58, 237, 0.08);
+  color:            var(--accent-soft);
+  border-radius:    4px;
+  padding:          1px 4px;
+  font-size:        0.9em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   Phase 5 — Sidebar Full-Text Search Results
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Search result item */
+.search-result-item {
+  display:         flex;
+  flex-direction:  column;
+  gap:             2px;
+  padding:         10px 10px;
+  border-radius:   8px;
+  border:          none;
+  background:      transparent;
+  cursor:          pointer;
+  width:           100%;
+  text-align:      left;
+  transition:      background 0.15s;
+}
+
+.search-result-item:hover {
+  background: var(--bg-surface-hover);
+}
+
+/* Highlighted match inside snippet */
+.search-highlight {
+  background-color: rgba(124, 58, 237, 0.25);
+  color:            var(--accent-soft);
+  border-radius:    2px;
+  padding:          0 2px;
+  font-weight:      600;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   Phase 5 — Settings Panel Memory Section
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.memory-item {
+  display:         flex;
+  align-items:     flex-start;
+  gap:             8px;
+  padding:         8px 10px;
+  border-radius:   8px;
+  background:      rgba(15, 15, 23, 0.4);
+  border:          1px solid var(--border);
+  transition:      background 0.15s;
+}
+
+.memory-item:hover {
+  background: rgba(15, 15, 23, 0.7);
+}
+
+.memory-delete-btn {
+  opacity:     0;
+  transition:  opacity 0.15s;
+  flex-shrink: 0;
+  padding:     2px;
+  background:  transparent;
+  border:      none;
+  cursor:      pointer;
+  border-radius: 4px;
+  color:       var(--text-muted);
+}
+
+.memory-item:hover .memory-delete-btn {
+  opacity: 1;
+}
+
+.memory-delete-btn:hover {
+  color:      var(--error);
+  background: rgba(248, 113, 113, 0.1);
+}
+
+/* ── Search Highlighting ── */
+.search-highlight {
+  background-color: rgba(124, 58, 237, 0.3) !important;
+  color: #ffffff !important;
+  border-radius: 4px;
+  padding: 0 4px;
+  border: 1px solid rgba(124, 58, 237, 0.6);
+}
+
+/* Hide scrollbars globally in mobile view */
+@media (max-width: 1023px) {
+  /* Hide scrollbar for Chrome, Safari, Opera and all webkit browsers */
+  ::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+  
+  /* Hide scrollbar for Firefox, IE and Edge */
+  * {
+    -ms-overflow-style: none !important;  /* IE and Edge */
+    scrollbar-width: none !important;  /* Firefox */
+  }
+}
+
+

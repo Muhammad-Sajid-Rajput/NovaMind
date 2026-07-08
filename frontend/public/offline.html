@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NovaMind — Offline</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #0f0f1a;
+      color: #f0effe;
+      font-family: Inter, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      text-align: center;
+      padding: 24px;
+    }
+    img  { width: 64px; border-radius: 16px; }
+    h1   { font-size: 20px; font-weight: 600; margin: 0; }
+    p    { font-size: 14px; color: #7a7594; margin: 0; }
+    button {
+      margin-top: 8px;
+      padding: 10px 24px;
+      background: #7c3aed;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <img src="/favicon.png" alt="NovaMind" />
+  <h1>You're offline</h1>
+  <p>NovaMind needs an internet connection to work.<br/>
+     Please check your connection and try again.</p>
+  <button onclick="window.location.reload()">Try again</button>
+</body>
+</html>

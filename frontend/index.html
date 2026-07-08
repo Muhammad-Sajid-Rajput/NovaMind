@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/webp" href="/favicon.webp" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NovaMind</title>
+
+  <!-- Google Fonts: Outfit (headings), Inter (body), Fira Code (monospace) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <!-- KaTeX — Math rendering (Phase 5) -->
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+    crossorigin="anonymous"
+  />
+
+  <!-- PWA & Mobile Web App Meta Tags -->
+  <meta name="theme-color" content="#7c3aed" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="NovaMind" />
+  <link rel="apple-touch-icon" href="/favicon.png" />
+
+  <!-- FIX 3: highlight.js is now imported via npm in ChatMessage.jsx — CDN links removed -->
+</head>
+
+<body>
+  <div id="root"></div>
+
+  <!-- FIX 3: highlight.js CDN script removed — imported as npm package instead -->
+
+  <!-- React main entry point -->
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
+</html>

@@ -1,0 +1,584 @@
+// NovaMind — useStream.js — Media Upload
+
+import { useState, useRef, useEffect } from "react";
+import { api } from "../../../config/api.js";
+
+const PASSWORD_COMMAND = "give me a unique key or password";
+
+export function useStream({
+  sessionId,
+  setChatMessages,
+  language,
+  contextLimit,
+  model,
+  setSelectedModel,
+  setActiveModel,
+  setModelStatus,
+  setFallbackUsed,
+  onSessionNamed,
+  editingMessageId,
+  chatMessages,
+  sessionsList,
+  setSessionsList,
+  setCurrentSessionId,
+  isStreamEnabled
+}) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const abortControllerRef = useRef(null);
+  const chunkBufferRef = useRef("");
+  const rafRef = useRef(null);
+
+  // Cleanup RAF on unmount
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, []);
+
+  // Rate Limiting Countdown Interval Timer
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const interval = setInterval(() => {
+      setCountdown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [countdown]);
+
+  const stopGeneration = () => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    chunkBufferRef.current = "";
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      setIsStreaming(false);
+      setIsLoading(false);
+    }
+  };
+
+  // Abort stream if editing begins
+  useEffect(() => {
+    if (editingMessageId !== null && isStreaming) {
+      stopGeneration();
+    }
+  }, [editingMessageId, isStreaming]);
+
+  // ── Send Message Handler ───────────────────────────
+  const sendMessage = async ({ message: inputText, file = null, files = [], isRagSession = false, skipAppend = false }) => {
+    const trimmedInput = inputText ? inputText.trim() : "";
+    if ((!trimmedInput && !file && (!files || files.length === 0)) || isLoading || countdown > 0) return;
+
+    let activeSessionId = sessionId;
+    setIsLoading(true);
+
+    const getTime = () => {
+      return new Date().toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hourCycle: "h12"
+      });
+    };
+    const time = getTime();
+
+    const isImage = !!(file && file.mimeType?.startsWith("image/"));
+
+    const userMessageObj = {
+      message: trimmedInput,
+      sender: "user",
+      id: crypto.randomUUID(),
+      time,
+      image: isImage ? file.url : null,
+      file: !isImage && file ? file : null,
+      files: files
+    };
+
+    const loadingId = crypto.randomUUID();
+    const loadingMessageObj = {
+      message: "__LOADING__",
+      sender: "robot",
+      id: loadingId,
+      time
+    };
+
+    const currentMsgs = chatMessages[activeSessionId] || chatMessages[sessionId] || [];
+    let historyToSend = currentMsgs;
+    if (skipAppend) {
+      let lastUserIndex = -1;
+      for (let i = currentMsgs.length - 1; i >= 0; i--) {
+        if (currentMsgs[i].sender === "user") {
+          lastUserIndex = i;
+          break;
+        }
+      }
+      if (lastUserIndex !== -1) {
+        historyToSend = currentMsgs.slice(0, lastUserIndex);
+      }
+    }
+
+    // ⚡ INSTANT OPTIMISTIC RENDERING (0ms) ⚡
+    setChatMessages((prev) => {
+      const msgs = prev[activeSessionId] || [];
+      const newMsgs = skipAppend ? msgs : [...msgs, userMessageObj];
+      return {
+        ...prev,
+        [activeSessionId]: [...newMsgs, loadingMessageObj]
+      };
+    });
+
+    // Async non-blocking session creation
+    const isLocal = !sessionsList.some((s) => s.id === sessionId);
+    if (isLocal) {
+      api.sessions.create({ sessionId: activeSessionId }).then((data) => {
+        const createdId = data.sessionId || activeSessionId;
+        const newSession = {
+          id: createdId,
+          name: "New Chat",
+          createdAt: new Date().toISOString()
+        };
+        setSessionsList((prev) => {
+          if (prev.some((s) => s.id === createdId)) return prev;
+          return [newSession, ...prev];
+        });
+      }).catch((err) => {
+        console.error("Failed to create session on server:", err);
+      });
+    }
+
+    if (onSessionNamed) {
+      if (currentMsgs.length === 0) {
+        onSessionNamed(activeSessionId, "New Chat");
+      }
+    }
+
+    abortControllerRef.current = new AbortController();
+
+    const isPasswordCommand =
+      trimmedInput.toLowerCase() === PASSWORD_COMMAND.toLowerCase();
+
+    if (isPasswordCommand) {
+      setChatMessages((prev) => {
+        const currentMsgs = prev[activeSessionId] || [];
+        return {
+          ...prev,
+          [activeSessionId]: [
+            ...currentMsgs,
+            {
+              message: "__LOADING__",
+              sender: "robot",
+              id: loadingId,
+              time
+            }
+          ]
+        };
+      });
+
+      try {
+        const data = await api.utils.password(12);
+        setChatMessages((prev) => {
+          const currentMsgs = prev[activeSessionId] || [];
+          return {
+            ...prev,
+            [activeSessionId]: currentMsgs.map((msg) =>
+              msg.id === loadingId
+                ? { ...msg, message: `Here is your unique key: ${data.password}` }
+                : msg
+            )
+          };
+        });
+      } catch (err) {
+        if (err.status === 429) {
+          setCountdown(err.data?.retryAfter || 900);
+          setChatMessages((prev) => {
+            const currentMsgs = prev[activeSessionId] || [];
+            return {
+              ...prev,
+              [activeSessionId]: currentMsgs.filter((m) => m.id !== loadingId)
+            };
+          });
+        } else {
+          setChatMessages((prev) => {
+            const currentMsgs = prev[activeSessionId] || [];
+            return {
+              ...prev,
+              [activeSessionId]: currentMsgs.map((msg) =>
+                msg.id === loadingId
+                  ? { ...msg, message: "Failed to generate unique key. Please check your connection and try again." }
+                  : msg
+              )
+            };
+          });
+        }
+      }
+      setIsLoading(false);
+      return;
+    }
+
+
+
+    if (!isStreamEnabled) {
+
+      try {
+        const data = await api.chat.send({
+          message: trimmedInput,
+          sessionId: activeSessionId,
+          language,
+          contextLimit,
+          model,
+          history: historyToSend,
+          isRagSession: isRagSession,
+          file: file,
+          files: files
+        });
+
+        if (data.model) {
+          setActiveModel(data.model);
+          if (data.model !== model) {
+            setFallbackUsed(data.model);
+            if (setSelectedModel) {
+              setSelectedModel(data.model);
+            }
+          }
+        }
+
+        if (data.sessionName && onSessionNamed) {
+          onSessionNamed(activeSessionId, data.sessionName);
+        }
+
+        setChatMessages((prev) => {
+          const currentMsgs = prev[activeSessionId] || [];
+          const loadingIdx = currentMsgs.findIndex((msg) => msg.id === loadingId);
+          let updatedMsgs = currentMsgs.map((msg) =>
+            msg.id === loadingId
+              ? {
+                  ...msg,
+                  message: data.reply,
+                  model: data.model,
+                  suggestions: data.suggestions
+                }
+              : msg
+          );
+
+          if (loadingIdx > 0) {
+            const precedingMsg = updatedMsgs[loadingIdx - 1];
+            const completedBotMsg = updatedMsgs[loadingIdx];
+            if (precedingMsg && precedingMsg.sender === "user" && precedingMsg.versions) {
+              const vIdx = precedingMsg.currentVersionIndex;
+              const updatedVersions = precedingMsg.versions.map((v, idx) =>
+                idx === vIdx ? { ...v, botResponse: completedBotMsg } : v
+              );
+              updatedMsgs[loadingIdx - 1] = {
+                ...precedingMsg,
+                versions: updatedVersions
+              };
+            }
+          }
+
+          return {
+            ...prev,
+            [activeSessionId]: updatedMsgs
+          };
+        });
+      } catch (err) {
+        const status = err.status || 500;
+        let errMsg = "Failed to get a response from the AI. Please try again.";
+        if (status === 503) {
+          errMsg = "The AI model is currently busy. Trying backup model... Please resend your message.";
+        } else if (status === 429) {
+          errMsg = "Daily limit reached for this model. Switch to Gemini 2.5 Flash Lite for 1500 requests/day.";
+          setCountdown(err.data?.retryAfter || 900);
+        }
+        const errObj = {
+          id: loadingId,
+          sender: "robot",
+          message: errMsg,
+          isError: true,
+          errStatus: status,
+          time
+        };
+
+        setChatMessages((prev) => {
+          const currentMsgs = prev[activeSessionId] || [];
+          return {
+            ...prev,
+            [activeSessionId]: currentMsgs.map((msg) => (msg.id === loadingId ? errObj : msg))
+          };
+        });
+        setModelStatus("error");
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    setIsStreaming(true);
+
+    setChatMessages((prev) => {
+      const currentMsgs = prev[activeSessionId] || [];
+      return {
+        ...prev,
+        [activeSessionId]: currentMsgs.map((msg) =>
+          msg.id === loadingId ? { ...msg, message: "", isStreaming: true } : msg
+        )
+      };
+    });
+
+    let streamedText = "";
+
+    const flushBuffer = () => {
+      if (!chunkBufferRef.current) {
+        rafRef.current = null;
+        return;
+      }
+      const buffered = chunkBufferRef.current;
+      chunkBufferRef.current = "";
+      setChatMessages((prev) => {
+        const sessionMsgs = prev[activeSessionId] || [];
+        return {
+          ...prev,
+          [activeSessionId]: sessionMsgs.map((msg) =>
+            msg.id === loadingId ? { ...msg, message: msg.message + buffered } : msg
+          )
+        };
+      });
+      rafRef.current = null;
+    };
+
+    const onChunk = (chunk) => {
+      streamedText += chunk;
+      chunkBufferRef.current += chunk;
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(flushBuffer);
+      }
+    };
+
+    const flushBufferSync = () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      if (chunkBufferRef.current) {
+        const buffered = chunkBufferRef.current;
+        chunkBufferRef.current = "";
+        setChatMessages((prev) => {
+          const sessionMsgs = prev[activeSessionId] || [];
+          return {
+            ...prev,
+            [activeSessionId]: sessionMsgs.map((msg) =>
+              msg.id === loadingId ? { ...msg, message: msg.message + buffered } : msg
+            )
+          };
+        });
+      }
+    };
+
+    try {
+      const response = await api.chat.stream({
+        message: trimmedInput,
+        sessionId: activeSessionId,
+        language,
+        contextLimit,
+        model,
+        history: historyToSend,
+        isRagSession: isRagSession,
+        file: file,
+        files: files
+      }, abortControllerRef.current.signal);
+
+      const status = response.status;
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        const err = new Error(data.error || "Failed to get response from server.");
+        err.status = status;
+        err.data = data;
+        if (status === 429) {
+          setCountdown(data.retryAfter || 900);
+        }
+        throw err;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          if (line === "data: [DONE]") {
+            break;
+          }
+          if (line.includes("event: session_name")) {
+            const dataMatch = line.match(/data:\s*(.*)/);
+            if (dataMatch && onSessionNamed) {
+              onSessionNamed(activeSessionId, dataMatch[1].trim());
+            }
+            continue;
+          }
+          if (line.startsWith("data: ")) {
+            const dataStr = line.substring(6);
+            try {
+              const parsed = JSON.parse(dataStr);
+              if (parsed.text) {
+                onChunk(parsed.text);
+              }
+              if (parsed.model) {
+                setActiveModel(parsed.model);
+                if (parsed.model !== model) {
+                  setFallbackUsed(parsed.model);
+                  if (setSelectedModel) {
+                    setSelectedModel(parsed.model);
+                  }
+                }
+                setChatMessages((prev) => {
+                  const currentMsgs = prev[activeSessionId] || [];
+                  return {
+                    ...prev,
+                    [activeSessionId]: currentMsgs.map((msg) =>
+                      msg.id === loadingId ? { ...msg, model: parsed.model } : msg
+                    )
+                  };
+                });
+              }
+              if (parsed.suggestions) {
+                setChatMessages((prev) => {
+                  const currentMsgs = prev[activeSessionId] || [];
+                  return {
+                    ...prev,
+                    [activeSessionId]: currentMsgs.map((msg) =>
+                      msg.id === loadingId ? { ...msg, suggestions: parsed.suggestions } : msg
+                    )
+                  };
+                });
+              }
+              if (parsed.error) {
+                const streamErr = new Error(parsed.error);
+                streamErr.status = parsed.status || 500;
+                streamErr.data = parsed;
+                throw streamErr;
+              }
+            } catch (e) {
+              if (e.status) throw e;
+              if (dataStr && !dataStr.startsWith("{") && !dataStr.startsWith("[")) {
+                onChunk(dataStr);
+              }
+            }
+          }
+        }
+      }
+
+      flushBufferSync();
+
+      setChatMessages((prev) => {
+        const currentMsgs = prev[activeSessionId] || [];
+        const loadingIdx = currentMsgs.findIndex((msg) => msg.id === loadingId);
+        
+        let updatedMsgs = currentMsgs.map((msg) =>
+          msg.id === loadingId ? { ...msg, isStreaming: false } : msg
+        );
+
+        if (loadingIdx > 0) {
+          const precedingMsg = updatedMsgs[loadingIdx - 1];
+          const completedBotMsg = updatedMsgs[loadingIdx];
+          if (precedingMsg && precedingMsg.sender === "user" && precedingMsg.versions) {
+            const vIdx = precedingMsg.currentVersionIndex;
+            const updatedVersions = precedingMsg.versions.map((v, idx) =>
+              idx === vIdx ? { ...v, botResponse: completedBotMsg } : v
+            );
+            updatedMsgs[loadingIdx - 1] = {
+              ...precedingMsg,
+              versions: updatedVersions
+            };
+          }
+        }
+
+        return {
+          ...prev,
+          [activeSessionId]: updatedMsgs
+        };
+      });
+    } catch (err) {
+      flushBufferSync();
+      if (err.name === "AbortError") {
+        setChatMessages((prev) => {
+          const currentMsgs = prev[activeSessionId] || [];
+          const loadingIdx = currentMsgs.findIndex((msg) => msg.id === loadingId);
+          
+          let updatedMsgs = currentMsgs.map((msg) =>
+            msg.id === loadingId
+              ? { ...msg, message: streamedText + " (Generation stopped)", isStreaming: false }
+              : msg
+          );
+
+          if (loadingIdx > 0) {
+            const precedingMsg = updatedMsgs[loadingIdx - 1];
+            const completedBotMsg = updatedMsgs[loadingIdx];
+            if (precedingMsg && precedingMsg.sender === "user" && precedingMsg.versions) {
+              const vIdx = precedingMsg.currentVersionIndex;
+              const updatedVersions = precedingMsg.versions.map((v, idx) =>
+                idx === vIdx ? { ...v, botResponse: completedBotMsg } : v
+              );
+              updatedMsgs[loadingIdx - 1] = {
+                ...precedingMsg,
+                versions: updatedVersions
+              };
+            }
+          }
+
+          return {
+            ...prev,
+            [activeSessionId]: updatedMsgs
+          };
+        });
+      } else {
+        const status = err.status || 500;
+        let errMsg = "Failed to get a response from the AI. Please try again.";
+        if (status === 503) {
+          errMsg = "The AI model is currently busy. Trying backup model... Please resend your message.";
+        } else if (status === 429) {
+          errMsg = "Daily limit reached for this model. Switch to Gemini 3.1 Flash Lite for 500 requests/day.";
+        }
+        const errObj = {
+          id: loadingId,
+          sender: "robot",
+          message: errMsg,
+          isError: true,
+          errStatus: status,
+          time,
+          isStreaming: false
+        };
+
+        setChatMessages((prev) => {
+          const currentMsgs = prev[activeSessionId] || [];
+          return {
+            ...prev,
+            [activeSessionId]: currentMsgs.map((msg) => (msg.id === loadingId ? errObj : msg))
+          };
+        });
+        setModelStatus("error");
+      }
+    } finally {
+      setIsStreaming(false);
+      setIsLoading(false);
+    }
+  };
+
+  return {
+    isLoading,
+    isStreaming,
+    countdown,
+    setCountdown,
+    sendMessage,
+    stopGeneration
+  };
+}
