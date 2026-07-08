@@ -37,7 +37,7 @@ export default class PDFParser {
         const screenshotRes = await parser.getScreenshot({ first: 5, scale: 1.2 });
         if (screenshotRes.pages && screenshotRes.pages.length > 0) {
           const { getModelWithKey } = await import('../../utils/keyManager.js');
-          const { model, reportSuccess, reportFailure } = getModelWithKey('gemini-2.5-flash-lite');
+          const { model, reportSuccess, reportFailure } = getModelWithKey('gemini-3.1-flash-lite');
           
           const transcriptParts = [];
           for (const page of screenshotRes.pages) {

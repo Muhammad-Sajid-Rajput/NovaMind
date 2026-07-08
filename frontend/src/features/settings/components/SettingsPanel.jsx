@@ -784,7 +784,10 @@ function SettingsPanel() {
 
       {/* Delete Account Portal Confirmation */}
       {showDeleteConfirm && createPortal(
-        <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+        <div 
+          className="fixed inset-0 z-100 flex items-center justify-center p-4"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-md transition-opacity"
             onClick={() => {

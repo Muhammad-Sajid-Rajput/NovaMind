@@ -608,6 +608,10 @@ textarea:active,
   font-size: 13px;
   line-height: 1.6;
   color: inherit;
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  border: none !important;
 }
 
 /* Version Navigator Styling */

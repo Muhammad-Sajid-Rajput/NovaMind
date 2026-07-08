@@ -9,7 +9,7 @@ import { logger } from '../../core/utils/logger.js';
 import { memoryExtractionsTotal } from '../../core/config/metrics.js';
 
 // Use the smallest/fastest model for extraction to conserve quota
-const MEMORY_MODEL = 'gemini-2.5-flash-lite';
+const MEMORY_MODEL = 'gemini-3.1-flash-lite';
 
 const buildExtractionPrompt = (userMessage, existingMemories) => `
 You are a memory extraction assistant.
@@ -39,18 +39,21 @@ Return ONLY a valid JSON array. Maximum 2 facts.
 If nothing clearly personal: []
 `.trim();
 
-const MEMORY_RELEVANCE_PATTERNS = [
-  /\b(me|my|mine|myself)\b/i,
-  /\b(i|i'm|i am|i've|i have)\b/i,
-  /\b(project|workspace|stack|job|career|work|study|school|university|college|resume|portfolio|goal|preference|prefer|recommend|suggest|choose|build for me)\b/i,
-  /\b(what do you know about me|tell me about me|based on my|for my next project|my next project)\b/i,
-];
-
 const shouldIncludeMemories = (userMessage) => {
-  if (!userMessage || typeof userMessage !== 'string') return true;
+  if (!userMessage || typeof userMessage !== 'string') return false;
   const normalized = userMessage.trim();
   if (!normalized) return false;
-  return MEMORY_RELEVANCE_PATTERNS.some((pattern) => pattern.test(normalized));
+
+  // Fast-path skip: too short to contain a fact, or pure conversational chit-chat
+  if (normalized.length < 8) return false;
+  const conversational = /^(hi|hey|hello|yo|thanks|thank you|ok|okay|lol|cool|nice|got it|sounds good|bye|goodbye)\b/i;
+  if (conversational.test(normalized)) return false;
+
+  // Fast-path skip: pure question with no first-person or factual-statement shape
+  const pureQuestionNoSelfRef = /^(what|why|how|when|where|which|is|are|can|does|do)\b.*\?$/i;
+  if (pureQuestionNoSelfRef.test(normalized) && !/\b(i|my|me|mine|myself)\b/i.test(normalized)) return false;
+
+  return true;
 };
 
 // ── Extract memories from a user message (fire-and-forget) ─────────────────
@@ -129,7 +132,7 @@ export const extractAndSaveMemories = ({ userId, userMessage, sessionId }) => {
 };
 
 // ── Get formatted memory string for system prompt injection ─────────────────
-export const getUserMemoriesForPrompt = async (userId, userMessage) => {
+export const getUserMemoriesForPrompt = async (userId) => {
   try {
     const memories = await Memory.find({ userId })
       .sort({ createdAt: -1 })
@@ -138,7 +141,6 @@ export const getUserMemoriesForPrompt = async (userId, userMessage) => {
       .lean();
 
     if (memories.length === 0) return '';
-    if (!shouldIncludeMemories(userMessage)) return '';
 
     const lines = memories.map((m) => `- ${m.content}`).join('\n');
 

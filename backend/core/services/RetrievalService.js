@@ -14,7 +14,7 @@ const rewriteQuery = async (userMessage, chatHistory) => {
 
   try {
     const { getModelWithKey } = await import('../utils/keyManager.js');
-    const { model, reportSuccess, reportFailure } = getModelWithKey('gemini-2.5-flash-lite');
+    const { model, reportSuccess, reportFailure } = getModelWithKey('gemini-3.1-flash-lite');
 
     // Build history transcript
     const historyText = chatHistory

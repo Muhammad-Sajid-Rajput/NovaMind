@@ -72,7 +72,7 @@ function buildLanguageInstruction(language) {
 }
 
 // ─── Shared system prompt builder ─────────────────────────────────────────────
-function buildSystemInstruction(language) {
+function buildSystemInstruction(language, message = "") {
   const langInstruction = buildLanguageInstruction(language);
   const systemCorrection = `
 Important:
@@ -80,15 +80,37 @@ Respond only according to the user's request.
 Do not introduce programming topics unless the user specifically asks about programming.
 Do NOT force personal references or relate every answer to the user's background unless they specifically ask or it is clearly relevant.
 `;
-  const combined = [SYSTEM_PROMPT, langInstruction, systemCorrection]
+  let combined = [SYSTEM_PROMPT, langInstruction, systemCorrection]
     .filter(Boolean)
     .join("\n");
+
+  // Dynamic Search Grounding Injection
+  if (message && message.includes("=== Web Search Results ===")) {
+    const currentDate = new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric"
+    });
+
+    const groundingInstructions = `
+STRICT SEARCH GROUNDING INSTRUCTIONS:
+- Current Date is: ${currentDate}.
+- A "=== Web Search Results ===" section is present in your input. You MUST ground your response strictly in those search results.
+- Prioritize search facts over your internal pre-trained knowledge. If a search result states that an event occurred or has a certain result, accept it as the absolute, current truth.
+- If the search results do not contain sufficient information to answer the query, state clearly that you cannot find the information instead of speculating or inventing facts.
+- Do NOT output, list, cite, or include any source URLs, links, or a "Sources:" reference section in your final response.
+`;
+    combined += "\n" + groundingInstructions;
+  }
+
   return formatSystemInstruction(combined);
 }
 
 // ─── generateReply (non-streaming) ───────────────────────────────────────────
 export const generateReply = async ({ message, history, model, language, imageParts = [] }) => {
-  const systemInstruction = buildSystemInstruction(language);
+  const systemInstruction = buildSystemInstruction(language, message);
+  logger.info("[GeminiService] Outgoing System Instruction:", { systemInstruction: systemInstruction?.parts?.[0]?.text });
   const { model: modelInstance, reportSuccess, reportFailure } = getModel(model, systemInstruction);
   const formattedHistory = formatGeminiHistory(history || []);
 
@@ -106,7 +128,8 @@ export const generateReply = async ({ message, history, model, language, imagePa
 
 // ─── generateStream (SSE streaming) ──────────────────────────────────────────
 export const generateStream = async ({ message, history, model, language, imageParts = [] }) => {
-  const systemInstruction = buildSystemInstruction(language);
+  const systemInstruction = buildSystemInstruction(language, message);
+  logger.info("[GeminiService] Outgoing System Instruction (Stream):", { systemInstruction: systemInstruction?.parts?.[0]?.text });
   const { model: modelInstance, reportSuccess, reportFailure } = getModel(model, systemInstruction);
   const formattedHistory = formatGeminiHistory(history || []);
 

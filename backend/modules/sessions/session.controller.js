@@ -72,20 +72,23 @@ export const deleteSession = asyncHandler(async (req, res) => {
   // 1. Fetch all messages to identify any Cloudinary file/image attachments
   const messages = await SessionStore.getMessages(id, userId);
 
-  // 2. Delete each attachment from Cloudinary
+  // 2. Delete each attachment from Cloudinary in parallel
+  const cloudinaryPromises = [];
   for (const msg of messages) {
     if (msg.image && msg.image.publicId) {
-      await deleteCloudinaryFile(msg.image.publicId, msg.image.resourceType || 'image');
+      cloudinaryPromises.push(deleteCloudinaryFile(msg.image.publicId, msg.image.resourceType || 'image'));
     } else if (msg.image && typeof msg.image === 'string') {
       const publicId = extractPublicId(msg.image);
       if (publicId) {
-        await deleteCloudinaryFile(publicId, 'image');
+        cloudinaryPromises.push(deleteCloudinaryFile(publicId, 'image'));
       }
     }
     if (msg.file && msg.file.publicId) {
-      await deleteCloudinaryFile(msg.file.publicId, msg.file.resourceType || 'raw');
+      cloudinaryPromises.push(deleteCloudinaryFile(msg.file.publicId, msg.file.resourceType || 'raw'));
     }
   }
+
+  await Promise.allSettled(cloudinaryPromises);
 
   // 3. Delete Pinecone vectors associated with this session
   try {
@@ -95,44 +98,40 @@ export const deleteSession = asyncHandler(async (req, res) => {
   }
 
   // 3a. Delete all file registries, chunks, and manifests associated with this session
-  // Note: Daily upload quota is NOT refunded on session/file deletion.
   try {
     const registries = await FileRegistry.find({ sessionId: id, userId });
+    const registryPromises = [];
+
     for (const reg of registries) {
       if (reg.publicId) {
-        await deleteCloudinaryFile(reg.publicId, 'raw');
+        registryPromises.push(deleteCloudinaryFile(reg.publicId, 'raw'));
       }
       if (reg.documentId) {
-        await DocumentChunk.deleteMany({ documentId: reg.documentId });
-        await DocumentManifest.deleteOne({ documentId: reg.documentId });
+        registryPromises.push(DocumentChunk.deleteMany({ documentId: reg.documentId }));
+        registryPromises.push(DocumentManifest.deleteOne({ documentId: reg.documentId }));
       } else if (reg.sha256 && reg.sha256 !== 'pending') {
-        const sampleChunk = await DocumentChunk.findOne({
-          sessionId: id,
-          userId,
-          'metadata.sha256': reg.sha256
-        });
-        if (sampleChunk && sampleChunk.documentId) {
-          await DocumentChunk.deleteMany({ documentId: sampleChunk.documentId });
-          await DocumentManifest.deleteOne({ documentId: sampleChunk.documentId });
-        } else {
-          await DocumentChunk.deleteMany({ sessionId: id, userId, 'metadata.sha256': reg.sha256 });
-          await DocumentManifest.deleteOne({ sessionId: id, title: reg.fileName });
-        }
+        registryPromises.push((async () => {
+          const sampleChunk = await DocumentChunk.findOne({
+            sessionId: id,
+            userId,
+            'metadata.sha256': reg.sha256
+          });
+          if (sampleChunk && sampleChunk.documentId) {
+            await DocumentChunk.deleteMany({ documentId: sampleChunk.documentId });
+            await DocumentManifest.deleteOne({ documentId: sampleChunk.documentId });
+          } else {
+            await DocumentChunk.deleteMany({ sessionId: id, userId, 'metadata.sha256': reg.sha256 });
+            await DocumentManifest.deleteOne({ sessionId: id, title: reg.fileName });
+          }
+        })());
       }
     }
+
+    await Promise.allSettled(registryPromises);
     await FileRegistry.deleteMany({ sessionId: id, userId });
     logger.info(`Deleted file registries, chunks, and manifests associated with session ${id}`);
   } catch (err) {
     logger.warn('Failed to delete file registries / chunks for session, continuing', { error: err.message, sessionId: id });
-  }
-
-  // 3b. Delete User Memories associated with this session
-  try {
-    const Memory = (await import("../memory/Memory.model.js")).default;
-    await Memory.deleteMany({ extractedFrom: id, userId });
-    logger.info(`Deleted memories associated with session ${id}`);
-  } catch (err) {
-    logger.warn('Failed to delete memories for session, continuing', { error: err.message, sessionId: id });
   }
 
   // 4. Cascade delete session metadata & messages from MongoDB
@@ -152,20 +151,23 @@ export const clearAllSessions = asyncHandler(async (req, res) => {
     // 2. Fetch all messages in these sessions to find Cloudinary attachments
     const messages = await Message.find({ sessionId: { $in: sessionIds }, userId }).lean();
 
-    // 3. Delete attachments from Cloudinary
+    // 3. Delete attachments from Cloudinary in parallel
+    const cloudinaryPromises = [];
     for (const msg of messages) {
       if (msg.image && msg.image.publicId) {
-        await deleteCloudinaryFile(msg.image.publicId, msg.image.resourceType || 'image');
+        cloudinaryPromises.push(deleteCloudinaryFile(msg.image.publicId, msg.image.resourceType || 'image'));
       } else if (msg.image && typeof msg.image === 'string') {
         const publicId = extractPublicId(msg.image);
         if (publicId) {
-          await deleteCloudinaryFile(publicId, 'image');
+          cloudinaryPromises.push(deleteCloudinaryFile(publicId, 'image'));
         }
       }
       if (msg.file && msg.file.publicId) {
-        await deleteCloudinaryFile(msg.file.publicId, msg.file.resourceType || 'raw');
+        cloudinaryPromises.push(deleteCloudinaryFile(msg.file.publicId, msg.file.resourceType || 'raw'));
       }
     }
+
+    await Promise.allSettled(cloudinaryPromises);
 
     // 4. Delete Pinecone vectors for all sessions
     try {
@@ -174,43 +176,40 @@ export const clearAllSessions = asyncHandler(async (req, res) => {
       logger.warn('Failed to delete Pinecone vectors during clear all chats', { error: err.message, userId });
     }
 
-    // 4b. Delete all user file registries, chunks, and manifests
+    // 4b. Delete all user file registries, chunks, and manifests in parallel
     try {
       const registries = await FileRegistry.find({ userId });
+      const registryPromises = [];
+
       for (const reg of registries) {
         if (reg.publicId) {
-          await deleteCloudinaryFile(reg.publicId, 'raw');
+          registryPromises.push(deleteCloudinaryFile(reg.publicId, 'raw'));
         }
         if (reg.documentId) {
-          await DocumentChunk.deleteMany({ documentId: reg.documentId });
-          await DocumentManifest.deleteOne({ documentId: reg.documentId });
+          registryPromises.push(DocumentChunk.deleteMany({ documentId: reg.documentId }));
+          registryPromises.push(DocumentManifest.deleteOne({ documentId: reg.documentId }));
         } else if (reg.sha256 && reg.sha256 !== 'pending') {
-          const sampleChunk = await DocumentChunk.findOne({
-            userId,
-            'metadata.sha256': reg.sha256
-          });
-          if (sampleChunk && sampleChunk.documentId) {
-            await DocumentChunk.deleteMany({ documentId: sampleChunk.documentId });
-            await DocumentManifest.deleteOne({ documentId: sampleChunk.documentId });
-          } else {
-            await DocumentChunk.deleteMany({ userId, 'metadata.sha256': reg.sha256 });
-            await DocumentManifest.deleteMany({ sessionId: reg.sessionId, title: reg.fileName });
-          }
+          registryPromises.push((async () => {
+            const sampleChunk = await DocumentChunk.findOne({
+              userId,
+              'metadata.sha256': reg.sha256
+            });
+            if (sampleChunk && sampleChunk.documentId) {
+              await DocumentChunk.deleteMany({ documentId: sampleChunk.documentId });
+              await DocumentManifest.deleteOne({ documentId: sampleChunk.documentId });
+            } else {
+              await DocumentChunk.deleteMany({ userId, 'metadata.sha256': reg.sha256 });
+              await DocumentManifest.deleteMany({ sessionId: reg.sessionId, title: reg.fileName });
+            }
+          })());
         }
       }
+
+      await Promise.allSettled(registryPromises);
       await FileRegistry.deleteMany({ userId });
       logger.info(`Deleted all file registries, chunks, and manifests for user ${userId}`);
     } catch (err) {
       logger.warn('Failed to delete file registries / chunks for user, continuing', { error: err.message, userId });
-    }
-
-    // 5. Delete all User Memories
-    try {
-      const Memory = (await import("../memory/Memory.model.js")).default;
-      await Memory.deleteMany({ userId });
-      logger.info(`Deleted all memories for user ${userId}`);
-    } catch (err) {
-      logger.warn('Failed to delete memories during clear all chats', { error: err.message, userId });
     }
 
     // 6. Delete all sessions and messages from MongoDB

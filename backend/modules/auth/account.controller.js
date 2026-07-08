@@ -9,6 +9,9 @@ import Message from "../messages/Message.model.js";
 import cloudinary from "../../core/config/cloudinary.js";
 import { deleteUserVectors } from "../../core/services/pineconeService.js";
 import Memory from "../memory/Memory.model.js";
+import FileRegistry from "../upload/models/FileRegistry.model.js";
+import DocumentChunk from "../upload/models/DocumentChunk.model.js";
+import DocumentManifest from "../upload/models/DocumentManifest.model.js";
 
 // ─── PATCH /api/auth/change-password ─────────────────────────────────────────
 export const changePassword = asyncHandler(async (req, res) => {
@@ -137,6 +140,32 @@ export const deleteAccount = asyncHandler(async (req, res) => {
     logger.info(`[DeleteAccount] Deleted all user memories for user: ${userId}`);
   } catch (err) {
     logger.error("[DeleteAccount] Failed to delete memories for user:", {
+      userId,
+      error: err.message
+    });
+  }
+
+  // 4c. Delete all uploaded documents, chunks, manifests, and Cloudinary raw files
+  try {
+    const registries = await FileRegistry.find({ userId }).select("documentId publicId").lean();
+    const documentIds = registries.map((r) => r.documentId).filter(Boolean);
+    const rawIds = registries.map((r) => r.publicId).filter(Boolean);
+
+    if (rawIds.length > 0) {
+      logger.info(`[DeleteAccount] Deleting ${rawIds.length} Cloudinary raw document assets for user: ${userId}`);
+      await cloudinary.api.delete_resources(rawIds, { resource_type: 'raw' });
+    }
+
+    await DocumentChunk.deleteMany({ userId });
+
+    if (documentIds.length > 0) {
+      await DocumentManifest.deleteMany({ documentId: { $in: documentIds } });
+    }
+
+    await FileRegistry.deleteMany({ userId });
+    logger.info(`[DeleteAccount] Deleted all file registries, chunks, and manifests for user: ${userId}`);
+  } catch (err) {
+    logger.error("[DeleteAccount] Failed to delete file registries / chunks for user:", {
       userId,
       error: err.message
     });

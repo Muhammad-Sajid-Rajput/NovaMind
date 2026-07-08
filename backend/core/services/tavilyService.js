@@ -56,12 +56,11 @@ export const formatSearchResults = (searchData) => {
 
   searchData.results.forEach((r, i) => {
     lines.push(`[${i + 1}] ${r.title}`);
-    lines.push(`URL: ${r.url}`);
     lines.push(`${r.content}\n`);
   });
 
   lines.push('=== End of Search Results ===');
-  lines.push('Please answer using the above search results and cite URLs.');
+  lines.push('Please answer the user query using the above search results. Do NOT output, list, cite, or include any source URLs, links, or a "Sources:" reference section in your final response.');
 
   return lines.join('\n');
 };

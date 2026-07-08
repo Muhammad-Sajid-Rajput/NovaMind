@@ -25,7 +25,7 @@ import { getDocumentType } from "../upload/upload.controller.js";
 
 const generateSessionName = async (userMessage, botReply) => {
   try {
-    const { model: modelInstance, reportSuccess, reportFailure } = getModel("gemini-2.5-flash-lite");
+    const { model: modelInstance, reportSuccess, reportFailure } = getModel("gemini-3.1-flash-lite");
     
     const prompt = `Generate a short 4-6 word title for a chat conversation.
        Do NOT use the raw user query or any filename directly.
@@ -80,15 +80,72 @@ function getTimeString() {
   });
 }
 
-// ── Detect if query needs web search ───────────────
-const needsWebSearch = (message) => {
-  const triggers = [
-    'latest', 'current', 'today', 'yesterday', 'recent',
-    'news', 'now', 'happening', 'live', 'score', 'price',
-    'weather', 'who won', 'what happened', '2024', '2025',
-  ];
-  const lower = message.toLowerCase();
-  return triggers.some(t => lower.includes(t));
+// ── Fast Deterministic Classifier ──────────────────
+export const shouldAttemptSearch = (message) => {
+  const lower = message.toLowerCase().trim();
+
+  // Fast-path skip: obviously conversational, no information need
+  const conversational = /^(hi|hey|hello|yo|thanks|thank you|ok|okay|lol|cool|nice|got it|sounds good|bye|goodbye)\b/;
+  if (conversational.test(lower)) return false;
+
+  // Everything else proceeds to rewriteSearchQuery, which can itself
+  // return "NO_SEARCH" if it determines no real-time info is needed.
+  return true;
+};
+
+// ── LLM Query Rewriter with Date Injection ──────────
+export const rewriteSearchQuery = async (message, history = []) => {
+  try {
+    const { model: modelInstance, reportSuccess, reportFailure } = getModel("gemini-3.1-flash-lite");
+    const currentDate = new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric"
+    });
+
+    // Format the last 4 messages of history for query context
+    const recentHistory = (history || []).slice(-4).map(msg => {
+      const senderName = msg.sender === "user" ? "User" : "Assistant";
+      const text = typeof msg.message === "string" ? msg.message.slice(0, 300) : "";
+      return `${senderName}: ${text}`;
+    }).join("\n");
+
+    const prompt = `You are an expert Query Classifier and Search Rewriter for a real-time AI assistant.
+Current Date: ${currentDate}
+
+Conversation History:
+${recentHistory || "(No history)"}
+
+User's Latest Message: "${message}"
+
+Your tasks:
+1. Determine if answering the User's Latest Message requires real-time/recent information (e.g., current events, weather, stock prices, live scores, recent releases, time-sensitive schedules).
+2. If real-time info is NOT required (e.g., general programming questions, simple math, request for creative writing, translation), return exactly: NO_SEARCH
+3. If real-time info IS required, write a Google-optimized search query. Follow these instructions:
+   - Carefully review the Conversation History to understand the subject context of the User's Latest Message (e.g. if the user says "who won?" after talking about the FIFA World Cup, the rewritten query must be about the FIFA World Cup final).
+   - Resolve relative time references (e.g., "today", "yesterday", "tomorrow", "next match", "current standings") into absolute dates using the Current Date: ${currentDate}.
+   - Keep the rewritten search query short, keyword-focused, and highly relevant.
+   - Do NOT include any punctuation, quotes, or markdown format.
+
+Return ONLY the rewritten search query or "NO_SEARCH".`;
+
+    const result = await modelInstance.generateContent(prompt);
+    reportSuccess();
+    return result.response.text().trim();
+  } catch (err) {
+    logger.warn('Failed to rewrite search query, falling back to original message', { error: err.message });
+    return message;
+  }
+};
+
+// ── Validate and Format Rewritten Query ─────────────
+export const validateAndFormatQuery = (rewritten, original) => {
+  if (!rewritten) return original;
+  const clean = rewritten.trim().replace(/^["'`]|["'`]$/g, "");
+  if (clean.toUpperCase() === "NO_SEARCH") return "NO_SEARCH";
+  if (clean.length < 3) return original;
+  return clean;
 };
 
 // ── Build context from RAG + web search ─────────────────
@@ -160,15 +217,36 @@ const buildContext = async ({
     }
   }
 
-  // Web search for current events
-  if (needsWebSearch(message)) {
+  // Web search for current events (Intent-aware + date injected Query Rewriter + Advanced Search & Reranking)
+  if (shouldAttemptSearch(message)) {
     try {
-      const searchData = await searchWeb(message, {
-        maxResults:  5,
-        searchDepth: 'basic',
-      });
-      if (searchData.results && searchData.results.length > 0) {
-        contextParts.push(formatSearchResults(searchData));
+      const rawRewritten = await rewriteSearchQuery(message, history);
+      const queryToUse = validateAndFormatQuery(rawRewritten, message);
+
+      if (queryToUse !== "NO_SEARCH") {
+        logger.info("Search query optimized", { original: message, queryToUse });
+        const searchData = await searchWeb(queryToUse, {
+          maxResults:  8, // Fetch slightly more to allow reranking
+          searchDepth: 'advanced',
+        });
+
+        if (searchData.results && searchData.results.length > 0) {
+          // Rerank results: sort by score descending
+          const sortedResults = [...searchData.results]
+            .sort((a, b) => (b.score || 0) - (a.score || 0))
+            // Filter by relevance threshold
+            .filter(r => (r.score || 0) >= 0.45)
+            // Keep top 3 results
+            .slice(0, 3);
+
+          if (sortedResults.length > 0) {
+            const rerankedData = {
+              ...searchData,
+              results: sortedResults
+            };
+            contextParts.push(formatSearchResults(rerankedData));
+          }
+        }
       }
     } catch (err) {
       logger.warn('Web search failed, continuing without results', {
@@ -269,7 +347,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
   const { cleanMessage, sid, history, isFirstMessage, preferredModelName } = ctx;
 
   // ── Phase 5: Inject user memories into system context ──────────────────────
-  const memoryContext = await getUserMemoriesForPrompt(userId.toString(), cleanMessage);
+  const memoryContext = await getUserMemoriesForPrompt(userId.toString());
 
   // Build RAG + web search context
   const extraContext = await buildContext({
@@ -422,7 +500,7 @@ export const sendStream = asyncHandler(async (req, res) => {
   const { cleanMessage, sid, history, isFirstMessage, preferredModelName } = ctx;
 
   // ── Phase 5: Inject user memories into system context ──────────────────────
-  const memoryContext = await getUserMemoriesForPrompt(userId.toString(), cleanMessage);
+  const memoryContext = await getUserMemoriesForPrompt(userId.toString());
 
   // Build RAG + web search context
   const extraContext = await buildContext({
