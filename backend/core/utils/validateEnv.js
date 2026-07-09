@@ -37,9 +37,7 @@ const envSchema = z.object({
   CLOUDINARY_API_SECRET: z.string().min(1, "CLOUDINARY_API_SECRET is required"),
 
   // ─── Redis (Phase 4) ────────────────────────────────────────────────────────
-  REDIS_HOST:            z.string().default("127.0.0.1"),
-  REDIS_PORT:            z.string().default("6379"),
-  REDIS_URL:             z.string().min(1, "REDIS_URL must be a valid connection string").optional(),
+  REDIS_URL:             z.string().min(1, "REDIS_URL is required"),
 
   // ─── Pinecone Vector DB (Phase 4) ──────────────────────────────────────────
   PINECONE_API_KEY:      z.string().min(1, "PINECONE_API_KEY is required"),
