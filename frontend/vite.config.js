@@ -7,7 +7,6 @@ import react            from '@vitejs/plugin-react';
 import tailwindcss      from '@tailwindcss/vite';
 import { VitePWA }      from 'vite-plugin-pwa';
 import viteCompression  from 'vite-plugin-compression';
-import { visualizer }   from 'rollup-plugin-visualizer';
 
 export default defineConfig({
   plugins: [
@@ -20,12 +19,6 @@ export default defineConfig({
     viteCompression({
       algorithm: 'brotliCompress',
       ext: '.br',
-    }),
-    visualizer({
-      filename: 'stats.html',
-      open: false,
-      gzipSize: true,
-      brotliSize: true,
     }),
 
     VitePWA({
@@ -138,7 +131,6 @@ export default defineConfig({
   server: {
     proxy: {
       // In development, proxy /api/* to the local Express backend.
-      // In production (Docker), Nginx handles this proxy instead.
       '/api': {
         target:       'http://localhost:5000',
         changeOrigin: true,

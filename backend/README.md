@@ -82,7 +82,7 @@ cp .env.example .env
 | `CLOUDINARY_CLOUD_NAME` | ✅ | Cloudinary cloud name |
 | `CLOUDINARY_API_KEY` | ✅ | Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | ✅ | Cloudinary API secret |
-| `REDIS_URL` | ✅ | Redis connection URL (BullMQ) |
+| `REDIS_URL` | ✅ | Upstash `rediss://` connection URL (BullMQ queues) |
 | `PINECONE_API_KEY` | ✅ | Pinecone API key |
 | `PINECONE_INDEX` | ✅ | Pinecone index name (e.g. `novamind`) |
 | `TAVILY_API_KEY` | ✅ | Tavily web search API key |

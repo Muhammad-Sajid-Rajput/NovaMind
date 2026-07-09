@@ -15,8 +15,6 @@ import { generalLimiter }     from "./core/middleware/rateLimit.js";
 import { logger }             from "./core/utils/logger.js";
 import { metricsMiddleware }  from "./core/middleware/metricsMiddleware.js";
 import { register }           from "./core/config/metrics.js";
-import swaggerUi              from "swagger-ui-express";
-import { swaggerDocument }    from "./core/config/swagger.js";
 
 const app = express();
 
@@ -106,9 +104,6 @@ app.get("/metrics", async (req, res) => {
     res.status(500).end(err.message);
   }
 });
-
-// ─── Interactive API Documentation (Swagger) ──────────────────────────────────
-app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // ─── General Rate Limit (catch-all safety net) ────────────────────────────────
 app.use("/api", generalLimiter);

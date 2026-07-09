@@ -1,13 +1,14 @@
-// NovaMind — redis.js — Phase 5
+// NovaMind — redis.js
+// Uses REDIS_URL (rediss:// for Upstash TLS, redis:// for local).
+// BullMQ requires two separate ioredis connections — one for the queue,
+// one for the worker — so we call createRedisConnection() twice.
 import Redis from 'ioredis';
 import { logger } from '../utils/logger.js';
 
 const createRedisConnection = () => {
-  const client = new Redis({
-    host:            process.env.REDIS_HOST || '127.0.0.1',
-    port:            parseInt(process.env.REDIS_PORT) || 6379,
+  const client = new Redis(process.env.REDIS_URL, {
     maxRetriesPerRequest: null, // required by BullMQ
-    enableReadyCheck: false,
+    enableReadyCheck:     false,
     retryStrategy: (times) => {
       if (times > 10) {
         logger.error('Redis connection failed after 10 retries');
@@ -17,18 +18,14 @@ const createRedisConnection = () => {
     },
   });
 
-  client.on('connect', () => 
-    logger.info('Redis connected successfully'));
-  client.on('error', (err) => 
-    logger.error('Redis error', { error: err.message }));
-  client.on('reconnecting', () => 
-    logger.warn('Redis reconnecting...'));
+  client.on('connect',     () => logger.info('Redis connected successfully'));
+  client.on('error',       (err) => logger.error('Redis error', { error: err.message }));
+  client.on('reconnecting',() => logger.warn('Redis reconnecting...'));
 
   return client;
 };
 
-// Create two separate connections:
-// BullMQ requires separate connections for queue and worker
+// Two separate connections required by BullMQ
 export const queueRedis  = createRedisConnection();
 export const workerRedis = createRedisConnection();
 

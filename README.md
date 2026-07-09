@@ -5,7 +5,6 @@
 [![Vite](https://img.shields.io/badge/vite-8.x-646CFF.svg)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/tailwind-v4-blueviolet.svg)](https://tailwindcss.com/)
 [![Gemini AI](https://img.shields.io/badge/Gemini%20API-2.5%20Flash-orange.svg)](https://ai.google.dev/)
-[![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg)](https://www.docker.com/)
 [![Prometheus](https://img.shields.io/badge/metrics-prometheus-E6522C.svg)](https://prometheus.io/)
 
 NovaMind is a production-hardened full-stack AI chatbot platform. It combines a React + Vite SPA with a Node.js + Express REST/SSE API and delivers multi-model Gemini key rotation, RAG document ingestion via BullMQ + Pinecone, AI-driven memory extraction, JWT dual-token authentication, Prometheus telemetry, and PWA offline support.
@@ -24,7 +23,7 @@ graph TD
         KaTeX[KaTeX Math Engine]
     end
 
-    subgraph Backend["Backend (Railway)"]
+    subgraph Backend["Backend (Render)"]
         Express[Express.js + SSE]
         Pino[Pino JSON Logger]
         Metrics[Prometheus Registry]
@@ -33,7 +32,7 @@ graph TD
 
     subgraph Data["Database Layer"]
         MongoDB[(MongoDB Atlas)]
-        Redis[(Redis / BullMQ Queue)]
+        Redis[(Upstash Redis)]
         Pinecone[(Pinecone Vector DB)]
     end
 
@@ -335,8 +334,8 @@ CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
 
-# Redis + BullMQ (background jobs)
-REDIS_URL=redis://localhost:6379
+# Redis + BullMQ (background jobs) — Upstash (free tier, TLS)
+REDIS_URL=rediss://default:<password>@<host>.upstash.io:6379
 
 # Pinecone Vector DB (RAG)
 PINECONE_API_KEY=your_pinecone_key
@@ -357,9 +356,6 @@ METRICS_SECRET=min_8_chars_metrics_secret
 # Install all workspaces
 npm run install:all
 
-# Start local MongoDB + Redis (optional — skip if you use Atlas / Redis Cloud)
-docker-compose up -d novamind-mongo novamind-redis
-
 # Boot both servers concurrently
 npm run dev
 ```
@@ -377,8 +373,8 @@ npm run dev
 ### Backend → Render
 1. Create a new **Web Service** on Render and link your GitHub repository.
 2. Set the **Root Directory** to `backend`, choose **Node** environment, set build command to `npm install`, and start command to `npm start`.
-3. Create a **Render Redis** instance (or use Redis Cloud / Upstash) and copy its connection URL.
-4. Add all environment variables from `backend/.env.example` in the Render environment settings (set `REDIS_URL` to your Redis connection URL).
+3. Add all environment variables from `backend/.env.example` in the Render environment settings.
+4. Set `REDIS_URL` to your Upstash `rediss://` connection URL.
 5. Set `ALLOWED_ORIGIN` to your Vercel frontend URL.
 
 ### Frontend → Vercel
@@ -386,8 +382,3 @@ npm run dev
 2. Add the environment variable `VITE_API_URL` pointing to your Render backend URL (e.g. `https://novamind-api.onrender.com`).
 3. Deploy — NovaMind is live.
 
-### Docker (self-hosted)
-```bash
-docker-compose up --build
-```
-Spins up: backend, frontend (nginx), MongoDB, and Redis.
