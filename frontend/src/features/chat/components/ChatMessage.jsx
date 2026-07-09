@@ -1,5 +1,5 @@
 // NovaMind — ChatMessage.jsx — Scroll Bug Fix
-import { memo, lazy, Suspense } from "react";
+import { memo, lazy, Suspense, useState, useRef, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { useChatContext } from "../context/ChatContext.jsx";
 import MessageActions from "./MessageActions.jsx";
@@ -57,6 +57,33 @@ function ChatMessage({
 }) {
   const { searchQuery, editingMessageId, setEditingMessageId } = useChatContext();
   const isEditing = id === editingMessageId;
+  const [isTouched, setIsTouched] = useState(false);
+  const touchTimeoutRef = useRef(null);
+
+  const handleTouch = () => {
+    setIsTouched((prev) => {
+      const next = !prev;
+      if (touchTimeoutRef.current) {
+        clearTimeout(touchTimeoutRef.current);
+        touchTimeoutRef.current = null;
+      }
+      if (next) {
+        touchTimeoutRef.current = setTimeout(() => {
+          setIsTouched(false);
+          touchTimeoutRef.current = null;
+        }, 5000);
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      if (touchTimeoutRef.current) {
+        clearTimeout(touchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   function renderUserText() {
     if (!searchQuery || searchQuery.trim() === "") {
@@ -91,7 +118,10 @@ function ChatMessage({
 
   if (isUser) {
     return (
-      <div className="w-full flex my-4 justify-end group animate-in fade-in duration-200">
+      <div 
+        className="w-full flex my-4 justify-end group animate-in fade-in duration-200"
+        onClick={handleTouch}
+      >
         <div className="flex flex-col items-end max-w-[85%] w-fit min-w-0">
           {isEditing ? (
             <div className="w-full flex flex-col gap-2 items-end">
@@ -256,6 +286,7 @@ function ChatMessage({
                 message={message}
                 sender={sender}
                 time={time}
+                isTouched={isTouched}
               />
             </>
           )}
@@ -267,6 +298,7 @@ function ChatMessage({
   return (
     <div
       className="w-full flex flex-col my-6 gap-2 items-start group relative max-w-180 mx-auto animate-in fade-in duration-200"
+      onClick={handleTouch}
     >
       <div className="flex-1 flex flex-col gap-1.5 min-w-0">
         {isError && (
@@ -326,6 +358,7 @@ function ChatMessage({
             isLastBotMessage={isLastBotMessage}
             onRegenerate={onRegenerate}
             model={model}
+            isTouched={isTouched}
           />
         )}
       </div>

@@ -77,8 +77,25 @@ function SettingsPanel() {
   const [deleteError, setDeleteError] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState(null);
+  const isIOS = typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const [installPrompt, setInstallPrompt] = useState(
+    typeof window !== "undefined" ? window.deferredPrompt : null
+  );
   const [isAppInstalled, setIsAppInstalled] = useState(false);
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
+
+  const handleInstallClick = async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setInstallPrompt(null);
+        window.deferredPrompt = null;
+      }
+    } else {
+      setShowInstallGuide((prev) => !prev);
+    }
+  };
 
   useEffect(() => {
     // Check if already running as standalone PWA
@@ -90,19 +107,29 @@ function SettingsPanel() {
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setInstallPrompt(e);
+      window.deferredPrompt = e;
     };
 
     const handleAppInstalled = () => {
       setIsAppInstalled(true);
       setInstallPrompt(null);
+      window.deferredPrompt = null;
+    };
+
+    const handleCustomInstallable = () => {
+      setInstallPrompt(window.deferredPrompt);
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     window.addEventListener("appinstalled", handleAppInstalled);
+    window.addEventListener("pwa:installable", handleCustomInstallable);
+    window.addEventListener("pwa:installed", handleAppInstalled);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
       window.removeEventListener("appinstalled", handleAppInstalled);
+      window.removeEventListener("pwa:installable", handleCustomInstallable);
+      window.removeEventListener("pwa:installed", handleAppInstalled);
     };
   }, []);
 
@@ -431,31 +458,59 @@ function SettingsPanel() {
                   </div>
                 </div>
 
-                {/* PWA App Installation */}
-                {installPrompt && !isAppInstalled && (
+                {/* PWA App Installation / Manual instructions fallback */}
+                {!isAppInstalled && (
                   <div className="flex flex-col gap-3 border-t pt-5" style={{ borderColor: "var(--color-border)" }}>
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Application</span>
-                    <div className="flex items-center justify-between border p-4 rounded-2xl" style={{ borderColor: "var(--color-border)", background: "rgba(255,255,255,0.01)" }}>
-                      <div className="flex-1 min-w-0 pr-3">
-                        <div className="text-xs font-bold text-text-primary">Install NovaMind App</div>
-                        <p className="text-[11px] text-text-secondary mt-1 leading-normal">
-                          Install NovaMind as a desktop or mobile application for offline capabilities and a full-screen standalone experience.
-                        </p>
+                    <div className="flex flex-col border p-4 rounded-2xl gap-4" style={{ borderColor: "var(--color-border)", background: "rgba(255,255,255,0.01)" }}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold text-text-primary">Install NovaMind App</div>
+                          <p className="text-[11px] text-text-secondary mt-1 leading-normal">
+                            Install NovaMind on your device (mobile, laptop, or desktop) for offline support, instant launches, and a full-screen app experience.
+                          </p>
+                        </div>
+                        <button
+                          className="px-4 py-2.5 text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-xl transition-all cursor-pointer border-none shadow-sm shrink-0 flex items-center gap-1.5"
+                          onClick={handleInstallClick}
+                        >
+                          <Icon icon="material-symbols:install-desktop-rounded" className="text-sm" />
+                          Install App
+                        </button>
                       </div>
-                      <button
-                        className="px-4 py-2.5 text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-xl transition-all cursor-pointer border-none shadow-sm shrink-0 flex items-center gap-1.5"
-                        onClick={async () => {
-                          if (!installPrompt) return;
-                          installPrompt.prompt();
-                          const { outcome } = await installPrompt.userChoice;
-                          if (outcome === 'accepted') {
-                            setInstallPrompt(null);
-                          }
-                        }}
-                      >
-                        <Icon icon="material-symbols:install-desktop-rounded" className="text-sm" />
-                        Install App
-                      </button>
+
+                      {/* Manual Installation Guidelines */}
+                      {showInstallGuide && !installPrompt && (
+                        <div className="mt-2 p-3.5 bg-background border rounded-xl flex flex-col gap-2.5 animate-in fade-in slide-in-from-top-2 duration-200" style={{ borderColor: "var(--color-border)" }}>
+                          <div className="flex items-center justify-between border-b pb-1.5" style={{ borderColor: "var(--color-border)" }}>
+                            <span className="text-[11.5px] font-bold text-text-primary">How to install manually:</span>
+                            <button 
+                              onClick={() => setShowInstallGuide(false)}
+                              className="bg-transparent border-none text-text-muted hover:text-text-primary cursor-pointer text-xs font-semibold"
+                            >
+                              Hide
+                            </button>
+                          </div>
+                          <ul className="list-none p-0 m-0 space-y-2 text-[11px] text-text-secondary">
+                            <li className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[9px] shrink-0 mt-0.5">1</span>
+                              <span><strong>For iOS Safari:</strong> Tap the <Icon icon="material-symbols:ios-share-rounded" className="inline text-xs align-text-bottom" /> Share button in Safari, scroll down, and select <strong>"Add to Home Screen"</strong>.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[9px] shrink-0 mt-0.5">2</span>
+                              <span><strong>For Chrome / Edge:</strong> Look at the right side of the browser URL bar and click the <Icon icon="material-symbols:install-desktop-rounded" className="inline text-xs align-text-bottom" /> <strong>Install</strong> or <strong>"+"</strong> icon.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[9px] shrink-0 mt-0.5">3</span>
+                              <span><strong>For Safari on Mac:</strong> Click File &rarr; Add to Dock.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="w-4 h-4 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[9px] shrink-0 mt-0.5">4</span>
+                              <span><strong>For other browsers:</strong> Tap the browser menu button (three dots/lines) and select <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong>.</span>
+                            </li>
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

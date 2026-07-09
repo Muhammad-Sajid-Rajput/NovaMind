@@ -2,40 +2,56 @@
 @import "tailwindcss";
 
 @keyframes errorAppear {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 :root {
   /* ── Backgrounds ── */
-  --bg-primary:        #0f0f17;   /* main chat area */
-  --bg-sidebar:        #090910;   /* sidebar — noticeably darker */
-  --bg-surface:        #1a1a26;   /* cards, modals, panels */
-  --bg-surface-hover:  #24243a;   /* hover states */
+  --bg-primary: #0f0f17;
+  /* main chat area */
+  --bg-sidebar: #090910;
+  /* sidebar — noticeably darker */
+  --bg-surface: #1a1a26;
+  /* cards, modals, panels */
+  --bg-surface-hover: #24243a;
+  /* hover states */
 
   /* ── User bubble ── */
-  --user-bubble:       #7c3aed;
+  --user-bubble: #7c3aed;
   --user-bubble-hover: #8b5cf6;
 
   /* ── Text ── */
-  --text-primary:      #f0effe;   /* main text — purple-tinted white */
-  --text-secondary:    #b8b4d0;   /* labels, descriptions — brighter */
-  --text-muted:        #7a7594;   /* timestamps, placeholders — readable */
+  --text-primary: #f0effe;
+  /* main text — purple-tinted white */
+  --text-secondary: #b8b4d0;
+  /* labels, descriptions — brighter */
+  --text-muted: #7a7594;
+  /* timestamps, placeholders — readable */
 
   /* ── Borders ── */
-  --border:            #2e2e45;   /* subtle but visible dividers */
-  --border-focus:      #6d28d9;   /* focus ring — actual violet */
+  --border: #2e2e45;
+  /* subtle but visible dividers */
+  --border-focus: #6d28d9;
+  /* focus ring — actual violet */
 
   /* ── Accent ── */
-  --accent:            #7c3aed;
-  --accent-hover:      #8b5cf6;
-  --accent-tint:       #1e1030;
-  --accent-soft:       #a78bfa;
+  --accent: #7c3aed;
+  --accent-hover: #8b5cf6;
+  --accent-tint: #1e1030;
+  --accent-soft: #a78bfa;
 
   /* ── Status ── */
-  --success:           #10b981;
-  --error:             #f87171;
-  --warning:           #facc15;
+  --success: #10b981;
+  --error: #f87171;
+  --warning: #facc15;
 }
 
 /* ─── Tailwind CSS v4 Theme Configuration ────────────────────────────────────── */
@@ -91,14 +107,14 @@
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-primary);
-  background-image: radial-gradient(
-    circle at 1px 1px,
-    rgba(124, 58, 237, 0.07) 1px,
-    transparent 0
-  );
+  background-image: radial-gradient(circle at 1px 1px,
+      rgba(124, 58, 237, 0.07) 1px,
+      transparent 0);
   background-size: 32px 32px;
   color: var(--color-text-primary);
   min-height: 100vh;
+  width: 100%;
+  margin: 0;
   display: flex;
   overflow: hidden;
   transition: background-color 0.15s ease, color 0.15s ease;
@@ -175,7 +191,7 @@ body {
   color: var(--color-text-primary);
 }
 
-.bot-markdown > :first-child {
+.bot-markdown> :first-child {
   margin-top: 0 !important;
 }
 
@@ -671,8 +687,14 @@ textarea:active,
 .bot-message-content {
   display: flow-root;
 }
-.bot-message-content > :first-child { margin-top: 0 !important; }
-.bot-message-content > :last-child  { margin-bottom: 0 !important; }
+
+.bot-message-content> :first-child {
+  margin-top: 0 !important;
+}
+
+.bot-message-content> :last-child {
+  margin-bottom: 0 !important;
+}
 
 .bot-bubble.streaming {
   min-height: 28px;
@@ -771,6 +793,7 @@ button,
     transform: translateX(120%);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;
@@ -782,6 +805,7 @@ button,
     transform: translateX(0);
     opacity: 1;
   }
+
   to {
     transform: translateX(120%);
     opacity: 0;
@@ -798,10 +822,14 @@ button,
 
 /* ─── Typing Indicator Dots (#17) ───────────────────────────────────────────── */
 @keyframes bounce-dot {
-  0%, 60%, 100% {
+
+  0%,
+  60%,
+  100% {
     transform: translateY(0);
     opacity: 0.4;
   }
+
   30% {
     transform: translateY(-5px);
     opacity: 1;
@@ -816,9 +844,17 @@ button,
   animation: bounce-dot 1.3s ease-in-out infinite;
 }
 
-.typing-dot:nth-child(1) { animation-delay: 0s; }
-.typing-dot:nth-child(2) { animation-delay: 0.2s; }
-.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+.typing-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
 
 /* ─── Premium Custom Scrollbars ────────────────────────────────────────────── */
 ::-webkit-scrollbar {
@@ -889,7 +925,7 @@ button,
 }
 
 /* 2. Input wrapper — premium focus glow */
-.chat-input-area > div:focus-within {
+.chat-input-area>div:focus-within {
   box-shadow:
     0 0 0 3px rgba(124, 58, 237, 0.09),
     0 8px 32px rgba(124, 58, 237, 0.13) !important;
@@ -901,10 +937,12 @@ button,
   box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);
   transition: box-shadow 0.2s ease, transform 0.15s ease !important;
 }
+
 .bg-primary.rounded-full:hover {
   box-shadow: 0 6px 22px rgba(124, 58, 237, 0.55) !important;
   transform: translateY(-1px);
 }
+
 .bg-primary.rounded-full:active {
   transform: translateY(0);
   box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3) !important;
@@ -912,11 +950,9 @@ button,
 
 /* 4. Active session item — violet left-border highlight */
 .sidebar-session-item.active {
-  background: linear-gradient(
-    90deg,
-    rgba(124, 58, 237, 0.18) 0%,
-    rgba(124, 58, 237, 0.06) 100%
-  ) !important;
+  background: linear-gradient(90deg,
+      rgba(124, 58, 237, 0.18) 0%,
+      rgba(124, 58, 237, 0.06) 100%) !important;
   border-left: 2px solid rgba(124, 58, 237, 0.7);
   padding-left: 6px !important;
 }
@@ -925,6 +961,7 @@ button,
 ::-webkit-scrollbar-thumb {
   background: rgba(124, 58, 237, 0.28);
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(124, 58, 237, 0.5);
 }
@@ -935,6 +972,7 @@ button,
   padding-left: 14px;
   transition: border-color 0.2s ease;
 }
+
 .bot-bubble:hover {
   border-left-color: rgba(124, 58, 237, 0.45);
 }
@@ -951,6 +989,7 @@ button,
   box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.3);
   transition: box-shadow 0.2s ease;
 }
+
 .sidebar-footer:hover div[style*="var(--color-primary)"] {
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.5);
 }
@@ -960,6 +999,7 @@ button,
   opacity: 0;
   transition: opacity 0.2s ease;
 }
+
 .message-wrapper:hover .message-timestamp,
 .group:hover .message-timestamp {
   opacity: 1;
@@ -969,6 +1009,7 @@ button,
 .online-dot {
   position: relative;
 }
+
 .online-dot::after {
   content: '';
   position: absolute;
@@ -977,15 +1018,24 @@ button,
   background: rgba(16, 185, 129, 0.3);
   animation: pulse-ring 2s ease infinite;
 }
+
 @keyframes pulse-ring {
-  0%   { transform: scale(0.8); opacity: 1; }
-  100% { transform: scale(1.9); opacity: 0; }
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
 }
 
 /* 11. Welcome screen logo glow */
 .welcome-logo-container {
   position: relative;
 }
+
 .welcome-logo-container::before {
   content: '';
   position: absolute;
@@ -1020,24 +1070,30 @@ input:-webkit-autofill:active {
 
 /* 14. Claude-style Media Upload UI keyframes & styles */
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .chat-input-wrapper {
-  display:       flex;
+  display: flex;
   flex-direction: column;
-  border:        1px solid var(--border);
+  border: 1px solid var(--border);
   border-radius: 16px;
-  background:    var(--bg-surface);
-  transition:    border-color 0.15s ease, box-shadow 0.15s ease;
-  overflow:      visible; /* allows X button to overflow */
-  position:      relative;
+  background: var(--bg-surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  overflow: visible;
+  /* allows X button to overflow */
+  position: relative;
 }
 
 .chat-input-wrapper:focus-within {
   border-color: rgba(124, 58, 237, 0.5);
-  box-shadow:   0 0 0 3px rgba(124, 58, 237, 0.08);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.08);
 }
 
 .chat-input-wrapper.is-glowing {
@@ -1061,8 +1117,8 @@ input:-webkit-autofill:active {
 
 /* Block display math ($$...$$) */
 .katex-display {
-  display:    block;
-  margin:     0.75em 0;
+  display: block;
+  margin: 0.75em 0;
   text-align: center;
   overflow-x: auto;
   overflow-y: hidden;
@@ -1075,12 +1131,12 @@ input:-webkit-autofill:active {
 
 /* Fallback when KaTeX cannot parse expression */
 .katex-fallback {
-  font-family:      var(--font-mono);
+  font-family: var(--font-mono);
   background-color: rgba(124, 58, 237, 0.08);
-  color:            var(--accent-soft);
-  border-radius:    4px;
-  padding:          1px 4px;
-  font-size:        0.9em;
+  color: var(--accent-soft);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 0.9em;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -1089,17 +1145,17 @@ input:-webkit-autofill:active {
 
 /* Search result item */
 .search-result-item {
-  display:         flex;
-  flex-direction:  column;
-  gap:             2px;
-  padding:         10px 10px;
-  border-radius:   8px;
-  border:          none;
-  background:      transparent;
-  cursor:          pointer;
-  width:           100%;
-  text-align:      left;
-  transition:      background 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 10px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background 0.15s;
 }
 
 .search-result-item:hover {
@@ -1109,10 +1165,10 @@ input:-webkit-autofill:active {
 /* Highlighted match inside snippet */
 .search-highlight {
   background-color: rgba(124, 58, 237, 0.25);
-  color:            var(--accent-soft);
-  border-radius:    2px;
-  padding:          0 2px;
-  font-weight:      600;
+  color: var(--accent-soft);
+  border-radius: 2px;
+  padding: 0 2px;
+  font-weight: 600;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -1120,14 +1176,14 @@ input:-webkit-autofill:active {
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 .memory-item {
-  display:         flex;
-  align-items:     flex-start;
-  gap:             8px;
-  padding:         8px 10px;
-  border-radius:   8px;
-  background:      rgba(15, 15, 23, 0.4);
-  border:          1px solid var(--border);
-  transition:      background 0.15s;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(15, 15, 23, 0.4);
+  border: 1px solid var(--border);
+  transition: background 0.15s;
 }
 
 .memory-item:hover {
@@ -1135,15 +1191,15 @@ input:-webkit-autofill:active {
 }
 
 .memory-delete-btn {
-  opacity:     0;
-  transition:  opacity 0.15s;
+  opacity: 0;
+  transition: opacity 0.15s;
   flex-shrink: 0;
-  padding:     2px;
-  background:  transparent;
-  border:      none;
-  cursor:      pointer;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
   border-radius: 4px;
-  color:       var(--text-muted);
+  color: var(--text-muted);
 }
 
 .memory-item:hover .memory-delete-btn {
@@ -1151,7 +1207,7 @@ input:-webkit-autofill:active {
 }
 
 .memory-delete-btn:hover {
-  color:      var(--error);
+  color: var(--error);
   background: rgba(248, 113, 113, 0.1);
 }
 
@@ -1166,18 +1222,19 @@ input:-webkit-autofill:active {
 
 /* Hide scrollbars globally in mobile view */
 @media (max-width: 1023px) {
+
   /* Hide scrollbar for Chrome, Safari, Opera and all webkit browsers */
   ::-webkit-scrollbar {
     display: none !important;
     width: 0 !important;
     height: 0 !important;
   }
-  
+
   /* Hide scrollbar for Firefox, IE and Edge */
   * {
-    -ms-overflow-style: none !important;  /* IE and Edge */
-    scrollbar-width: none !important;  /* Firefox */
+    -ms-overflow-style: none !important;
+    /* IE and Edge */
+    scrollbar-width: none !important;
+    /* Firefox */
   }
 }
-
-

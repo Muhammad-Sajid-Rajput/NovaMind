@@ -22,6 +22,19 @@ if (import.meta.env.DEV && "serviceWorker" in navigator) {
   });
 }
 
+// Global PWA deferred prompt listener to enable custom installation button in Settings
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    window.deferredPrompt = e;
+    window.dispatchEvent(new CustomEvent("pwa:installable"));
+  });
+  window.addEventListener("appinstalled", () => {
+    window.deferredPrompt = null;
+    window.dispatchEvent(new CustomEvent("pwa:installed"));
+  });
+}
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>

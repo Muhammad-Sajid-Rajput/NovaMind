@@ -38,7 +38,7 @@ function ChatHeader() {
         </button>
 
         {/* Current Session Title */}
-        <span className="font-sans font-medium text-text-primary text-sm select-none truncate max-w-37.5 sm:max-w-50 md:max-w-75 lg:text-base">
+        <span className="font-sans font-medium text-text-primary text-sm select-none truncate lg:text-base">
           {sessionName}
         </span>
       </div>

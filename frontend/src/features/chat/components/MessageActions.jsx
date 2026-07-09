@@ -17,7 +17,8 @@ function MessageActions({
   time,
   isLastBotMessage,
   onRegenerate,
-  model
+  model,
+  isTouched
 }) {
   const {
     setChatMessages,
@@ -82,7 +83,11 @@ function MessageActions({
   if (isUser) {
     return (
       <div className="flex items-center gap-3.5 mt-1.5 text-xs text-text-muted select-none px-1 h-5">
-        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+        <div className={`flex items-center gap-2 transition-opacity duration-200 ${
+          isTouched 
+            ? "opacity-100" 
+            : "opacity-0 md:group-hover:opacity-100 focus-within:opacity-100"
+        }`}>
           <button
             className="bg-transparent border-none text-text-secondary hover:text-primary cursor-pointer p-0.5 rounded transition-all text-lg flex items-center justify-center relative focus:ring-1 focus:ring-primary focus:outline-none"
             onClick={handleCopy}
@@ -120,7 +125,11 @@ function MessageActions({
         {model ? ` · ${MODELS_LABELS[model] || model}` : ""}
       </span>
 
-      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+      <div className={`flex items-center gap-2 transition-opacity duration-200 ${
+        isTouched 
+          ? "opacity-100" 
+          : "opacity-0 md:group-hover:opacity-100 focus-within:opacity-100"
+      }`}>
         <button
           className="bg-transparent border-none text-text-secondary hover:text-primary cursor-pointer p-0.5 rounded transition-all text-lg flex items-center justify-center relative focus:ring-1 focus:ring-primary focus:outline-none"
           onClick={handleCopy}

@@ -116,7 +116,7 @@ function SubmitButton({ loading, label, loadingLabel, fullWidth = true }) {
 function AuthCard({ children }) {
   return (
     <div
-      className="h-screen w-screen overflow-hidden relative flex flex-col items-center justify-center font-sans antialiased p-4 sm:p-8"
+      className="min-h-screen w-full relative flex flex-col items-center justify-center font-sans antialiased p-4 sm:p-8"
       style={{ background: "linear-gradient(135deg, var(--bg-sidebar) 0%, var(--bg-primary) 55%, rgba(124, 58, 237, 0.22) 100%)" }}
     >
       {/* Brand */}
