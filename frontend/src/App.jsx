@@ -14,6 +14,7 @@ import relativeTime      from "dayjs/plugin/relativeTime";
 
 const AuthPage     = lazy(() => import("./features/auth/pages/AuthPage.jsx"));
 const ChatPage     = lazy(() => import("./features/chat/pages/ChatPage.jsx"));
+const LandingPage  = lazy(() => import("./core/pages/LandingPage.jsx"));
 const NotFoundPage = lazy(() => import("./core/pages/NotFoundPage.jsx"));
 
 dayjs.extend(relativeTime);
@@ -57,6 +58,9 @@ function AppRoutes() {
   return (
     <Suspense fallback={<LoadingScreen />}>
       <Routes>
+        {/* Public root landing page */}
+        <Route path="/" element={<LandingPage />} />
+
         {/* Public auth routes — AuthLayout redirects logged-in users to /chat */}
         <Route element={<AuthLayout />}>
           <Route path="/auth/login"      element={<AuthPage />} />
@@ -68,10 +72,6 @@ function AppRoutes() {
 
         {/* Protected chat routes — require valid accessToken */}
         <Route element={<ProtectedRoute />}>
-          <Route
-            path="/"
-            element={<Navigate to="/new" replace />}
-          />
           <Route
             path="/chat"
             element={<Navigate to="/new" replace />}

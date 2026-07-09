@@ -24,8 +24,11 @@ async function startServer() {
   logger.info("Background worker started");
 
   const server = app.listen(PORT, () => {
-    logger.info(`🚀  NovaMind server running at http://localhost:${PORT}`);
-    logger.info(`📡  API endpoints available at http://localhost:${PORT}/api`);
+    logger.info("🚀 NovaMind API started");
+    logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`Listening on port: ${PORT}`);
+    logger.info("API Base Path: /api");
+    logger.info("Health Endpoint: /health");
   });
 
   // ─── Graceful Shutdown ──────────────────────────────────────────────────────

@@ -8,6 +8,9 @@ import morgan       from "morgan";
 import helmet       from "helmet";
 import compression  from "compression";
 import cookieParser from "cookie-parser";
+import fs           from "fs";
+import path         from "path";
+import { fileURLToPath } from "url";
 
 import apiRouter              from "./routes/index.js";
 import { globalErrorHandler } from "./core/middleware/errorHandler.js";
@@ -103,6 +106,36 @@ app.get("/metrics", async (req, res) => {
     logger.error("Failed to scrape Prometheus metrics", { error: err.message });
     res.status(500).end(err.message);
   }
+});
+
+// ─── Load Package Version ─────────────────────────────────────────────────────
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const pkgPath = path.join(__dirname, "package.json");
+let version = "1.0.0";
+try {
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+  version = pkg.version || "1.0.0";
+} catch (err) {
+  // Safe fallback if package.json is missing or unreadable
+}
+
+// ─── Health Check Endpoint (Render/Load Balancers) ───────────────────────────
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    service: "NovaMind API",
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ─── Root Endpoint (API JSON Status) ──────────────────────────────────────────
+app.get("/", (req, res) => {
+  res.json({
+    name: "NovaMind API",
+    status: "running",
+    version,
+    health: "/health"
+  });
 });
 
 // ─── General Rate Limit (catch-all safety net) ────────────────────────────────

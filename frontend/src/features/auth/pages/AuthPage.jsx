@@ -1,6 +1,9 @@
-// NovaMind — AuthPage.jsx — Error System
+// NovaMind — AuthPage.jsx
+// Handles all auth flows: login, register (multi-step), forgot/reset password, OTP.
+// Initial form mode is derived from the URL path so /auth/register opens signup directly.
 
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "../../../core/context/AuthContext.jsx";
 import { Icon } from "@iconify/react";
 import authBg from "../../../assets/auth.webp";
@@ -676,7 +679,19 @@ function RegisterForm({ onSwitchToLogin }) {
 // ROOT EXPORT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AuthPage() {
-  const [mode, setMode] = useState("login");
+  const { pathname } = useLocation();
+
+  // Derive the initial mode from the URL so /auth/register opens registration
+  // and /auth/login, /auth/forgot, /auth/verify-otp, /auth/reset map correctly.
+  const initMode = () => {
+    if (pathname.includes("register"))      return "register";
+    if (pathname.includes("forgot"))        return "forgot-password";
+    if (pathname.includes("verify-otp"))   return "verify-reset-code";
+    if (pathname.includes("reset"))        return "reset-password";
+    return "login";
+  };
+
+  const [mode, setMode] = useState(initMode);
   const [resetEmail, setResetEmail] = useState("");
   const [resetCode, setResetCode] = useState("");
 

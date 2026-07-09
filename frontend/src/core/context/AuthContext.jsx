@@ -205,6 +205,9 @@ export function AuthProvider({ children }) {
 
       updateAccessToken(null);
       setUser(null);
+
+      // Redirect to landing page — full navigation clears all in-memory state
+      window.location.href = "/";
     }
   }, [accessToken, updateAccessToken]);
 
