@@ -14,6 +14,8 @@ import { retrieveContext } from "../../core/services/RetrievalService.js";
 import { searchWeb, formatSearchResults } from "../../core/services/tavilyService.js";
 import {
   extractAndSaveMemories,
+  saveExplicitMemory,
+  isExplicitSaveRequest,
   getUserMemoriesForPrompt,
 } from "../memory/memoryService.js";
 import {
@@ -346,7 +348,9 @@ export const sendMessage = asyncHandler(async (req, res) => {
 
   const { cleanMessage, sid, history, isFirstMessage, preferredModelName } = ctx;
 
-  // ── Phase 5: Inject user memories into system context ──────────────────────
+  // ── Phase 5: Inject user memories into system instruction ─────────────────
+  // memoryContext → goes into the Gemini system instruction (persistent persona context)
+  // extraContext  → RAG / web search results → stays in user message body
   const memoryContext = await getUserMemoriesForPrompt(userId.toString());
 
   // Build RAG + web search context
@@ -358,10 +362,9 @@ export const sendMessage = asyncHandler(async (req, res) => {
     history,
   });
 
-  // Prepend memory + RAG context to message
-  const contextParts = [memoryContext, extraContext].filter(Boolean);
-  const enrichedMessage = contextParts.length > 0
-    ? `${contextParts.join('\n\n')}\n\nUser Question: ${cleanMessage}`
+  // Only RAG/search context goes into the message body
+  const enrichedMessage = extraContext
+    ? `${extraContext}\n\nUser Question: ${cleanMessage}`
     : cleanMessage;
 
   messagesSentTotal.inc();
@@ -399,7 +402,8 @@ export const sendMessage = asyncHandler(async (req, res) => {
         history: activeHistory,
         model: m,
         language,
-        imageParts
+        imageParts,
+        memoryContext,
       });
     },
     preferredModelName
@@ -437,15 +441,24 @@ export const sendMessage = asyncHandler(async (req, res) => {
   });
 
   // ── Phase 5: Fire-and-forget memory extraction ──────────────────────────────
-  if (cleanMessage.length > 20) {
-    extractAndSaveMemories({
-      userId:      userId.toString(),
+  // Explicit path ("remember that…") → guaranteed save, no LLM judgment gate.
+  // Implicit path → best-effort LLM extraction, may return [].
+  let finalReply = reply;
+  if (await isExplicitSaveRequest(cleanMessage)) {
+    const saveResult = await saveExplicitMemory({
+      userId: userId.toString(),
       userMessage: cleanMessage,
-      sessionId,
+      assistantReply: reply,
+      sessionId
     });
+    if (saveResult && !saveResult.success) {
+      finalReply += "\n\n*(Note: I wasn't able to save that to your memory. Please try again.)*";
+    }
+  } else {
+    extractAndSaveMemories({ userId: userId.toString(), userMessage: cleanMessage, assistantReply: reply, sessionId });
   }
 
-  res.json({ reply, model: modelUsed, sessionName: generatedName });
+  res.json({ reply: finalReply, model: modelUsed, sessionName: generatedName });
 });
 
 export const sendStream = asyncHandler(async (req, res) => {
@@ -499,7 +512,9 @@ export const sendStream = asyncHandler(async (req, res) => {
 
   const { cleanMessage, sid, history, isFirstMessage, preferredModelName } = ctx;
 
-  // ── Phase 5: Inject user memories into system context ──────────────────────
+  // ── Phase 5: Inject user memories into system instruction ─────────────────
+  // memoryContext → goes into the Gemini system instruction (persistent persona context)
+  // extraContext  → RAG / web search results → stays in user message body
   const memoryContext = await getUserMemoriesForPrompt(userId.toString());
 
   // Build RAG + web search context
@@ -510,10 +525,9 @@ export const sendStream = asyncHandler(async (req, res) => {
     isRagSession: isRagSession !== false,
   });
 
-  // Prepend memory + RAG context to message
-  const contextParts = [memoryContext, extraContext].filter(Boolean);
-  const enrichedMessage = contextParts.length > 0
-    ? `${contextParts.join('\n\n')}\n\nUser Question: ${cleanMessage}`
+  // Only RAG/search context goes into the message body
+  const enrichedMessage = extraContext
+    ? `${extraContext}\n\nUser Question: ${cleanMessage}`
     : cleanMessage;
 
   activeStreams.inc();
@@ -556,7 +570,8 @@ export const sendStream = asyncHandler(async (req, res) => {
           history: activeHistory,
           model: m,
           language,
-          imageParts
+          imageParts,
+          memoryContext,
         });
       },
       preferredModelName
@@ -586,10 +601,32 @@ export const sendStream = asyncHandler(async (req, res) => {
       onComplete: async (completeReply, isAborted) => {
         const finalReply = isAborted ? completeReply + " (Generation stopped)" : completeReply;
         if (finalReply.trim() !== "") {
+          let finalBotReply = finalReply;
+
+          // ── Phase 5: Fire-and-forget memory extraction ────────────────────
+          // Explicit path ("remember that…") → guaranteed save, no LLM judgment gate.
+          // Implicit path → best-effort LLM extraction, may return [].
+          if (await isExplicitSaveRequest(cleanMessage)) {
+            const saveResult = await saveExplicitMemory({
+              userId: userId.toString(),
+              userMessage: cleanMessage,
+              assistantReply: finalReply,
+              sessionId
+            });
+            if (saveResult && !saveResult.success) {
+              const errorNotice = "\n\n*(Note: I wasn't able to save that to your memory. Please try again.)*";
+              finalBotReply += errorNotice;
+              res.write(`data: ${JSON.stringify({ text: errorNotice })}\n\n`);
+              if (typeof res.flush === "function") res.flush();
+            }
+          } else {
+            extractAndSaveMemories({ userId: userId.toString(), userMessage: cleanMessage, assistantReply: finalReply, sessionId });
+          }
+
           await SessionStore.addMessage(sid, userId, {
             id: crypto.randomUUID(),
             sender: "robot",
-            message: finalReply,
+            message: finalBotReply,
             time,
             model: modelUsed
           });
@@ -599,15 +636,6 @@ export const sendStream = asyncHandler(async (req, res) => {
             const name = await generateSessionName(cleanMessage, finalReply);
             await SessionStore.updateSessionName(sid, userId, name);
             res.write(`event: session_name\ndata: ${name}\n\n`);
-          }
-
-          // ── Phase 5: Fire-and-forget memory extraction ────────────────────
-          if (cleanMessage.length > 20) {
-            extractAndSaveMemories({
-              userId:      userId.toString(),
-              userMessage: cleanMessage,
-              sessionId,
-            });
           }
         }
       },

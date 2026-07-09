@@ -72,7 +72,7 @@ function buildLanguageInstruction(language) {
 }
 
 // ─── Shared system prompt builder ─────────────────────────────────────────────
-function buildSystemInstruction(language, message = "") {
+function buildSystemInstruction(language, message = "", memoryContext = "") {
   const langInstruction = buildLanguageInstruction(language);
   const systemCorrection = `
 Important:
@@ -83,6 +83,12 @@ Do NOT force personal references or relate every answer to the user's background
   let combined = [SYSTEM_PROMPT, langInstruction, systemCorrection]
     .filter(Boolean)
     .join("\n");
+
+  // ── Inject user memory profile into system instruction ───────────────────────
+  // This block is always included when memories exist. Gemini decides when to use them.
+  if (memoryContext) {
+    combined += `\n\n=== User Memory Profile ===\n${memoryContext}\n=== End Memory Profile ===`;
+  }
 
   // Dynamic Search Grounding Injection
   if (message && message.includes("=== Web Search Results ===")) {
@@ -107,9 +113,9 @@ STRICT SEARCH GROUNDING INSTRUCTIONS:
   return formatSystemInstruction(combined);
 }
 
-// ─── generateReply (non-streaming) ───────────────────────────────────────────
-export const generateReply = async ({ message, history, model, language, imageParts = [] }) => {
-  const systemInstruction = buildSystemInstruction(language, message);
+// ─── generateReply (non-streaming) ─────────────────────────────────────────────
+export const generateReply = async ({ message, history, model, language, imageParts = [], memoryContext = "" }) => {
+  const systemInstruction = buildSystemInstruction(language, message, memoryContext);
   logger.info("[GeminiService] Outgoing System Instruction:", { systemInstruction: systemInstruction?.parts?.[0]?.text });
   const { model: modelInstance, reportSuccess, reportFailure } = getModel(model, systemInstruction);
   const formattedHistory = formatGeminiHistory(history || []);
@@ -126,9 +132,9 @@ export const generateReply = async ({ message, history, model, language, imagePa
   }
 };
 
-// ─── generateStream (SSE streaming) ──────────────────────────────────────────
-export const generateStream = async ({ message, history, model, language, imageParts = [] }) => {
-  const systemInstruction = buildSystemInstruction(language, message);
+// ─── generateStream (SSE streaming) ─────────────────────────────────────────────
+export const generateStream = async ({ message, history, model, language, imageParts = [], memoryContext = "" }) => {
+  const systemInstruction = buildSystemInstruction(language, message, memoryContext);
   logger.info("[GeminiService] Outgoing System Instruction (Stream):", { systemInstruction: systemInstruction?.parts?.[0]?.text });
   const { model: modelInstance, reportSuccess, reportFailure } = getModel(model, systemInstruction);
   const formattedHistory = formatGeminiHistory(history || []);

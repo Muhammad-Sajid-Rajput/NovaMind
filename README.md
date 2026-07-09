@@ -85,7 +85,7 @@ chatbot-project/
 │   │   │   ├── gemini.js            # Multi-key round-robin Gemini initializer
 │   │   │   ├── metrics.js           # Prometheus metrics registry
 │   │   │   ├── redis.js             # BullMQ Redis connection
-│   │   │   └── systemPrompt.js      # System prompt builder with memory injection
+│   │   │   └── systemPrompt.js      # Base system prompt constant
 │   │   ├── db/
 │   │   │   ├── connect.js           # MongoDB connection handler
 │   │   │   └── seed.js              # Dev/test seed script
@@ -102,8 +102,8 @@ chatbot-project/
 │   │       └── tavilyService.js     # Real-time web search API
 │   │
 │   ├── modules/
-│   │   ├── auth/                    # Register, OTP verify, login, password change, delete
-│   │   ├── chat/                    # SSE streaming, Tavily injection, full-text search
+│   │   ├── auth/                    # Register, OTP verify, login, password reset, delete
+│   │   ├── chat/                    # SSE streaming, web search injection, RAG context
 │   │   ├── memory/                  # AI-driven user fact extraction (fire-and-forget)
 │   │   ├── messages/                # FIFO-capped conversation history (200 msgs/session)
 │   │   ├── models/                  # MongoDB TTL model cooldown definitions
@@ -162,6 +162,59 @@ chatbot-project/
 
 ---
 
+## 🧠 AI Memory System
+
+NovaMind extracts and stores personal facts about each user across sessions, so the AI builds a persistent understanding of who you are over time.
+
+### Two parallel save paths
+
+#### 1. Implicit extraction (best-effort)
+Every user message is evaluated after the AI response completes (fire-and-forget, never blocking). A lightweight LLM pass (`gemini-3.1-flash-lite`) extracts personal facts and stores them in the `memories` collection. The extraction LLM itself decides what's worth saving — if nothing clearly personal is found, it returns `[]` and nothing is stored.
+
+Fast-path skips are applied before the LLM call to conserve quota:
+- Messages shorter than 8 characters
+- Pure conversational openers (`hi`, `thanks`, `ok`, etc.)
+- Pure questions with no first-person reference (`what is X?`)
+
+#### 2. Explicit save (guaranteed)
+When a user explicitly asks to save something, the fact is **guaranteed** to be stored regardless of LLM judgment:
+
+> "Remember that I prefer TypeScript over JavaScript"  
+> "Don't forget I'm a senior MERN developer"  
+> "Keep in mind that I work in dark mode"
+
+Trigger phrases detected (apostrophe-tolerant — matches `don't`, `don't`, and `dont` equally):
+- `remember that / this`
+- `save this / that`
+- `don't forget / dont forget that / this`
+- `won't forget / wont forget`
+- `can't forget / cant forget`
+- `keep in mind that / this`
+- `note that / this`
+- `for future reference`
+- `always remember` / `please remember`
+
+The LLM cleans the phrasing (strips the trigger phrase, rephrases as a neutral fact). If the LLM call fails, the raw message with the trigger phrase stripped is stored as a fallback — the fact is **never silently lost**. Deduplication still applies (near-identical memories are skipped), but there is **no cap on facts per message** on the explicit path.
+
+### Memory injection into Gemini
+
+Retrieved memories are injected directly into the **Gemini system instruction** (not the user message body) as a `=== User Memory Profile ===` block on every chat request. This means memories function as persistent persona context — Gemini sees them at the same level as its core behavioral instructions, not as ephemeral per-request input. The system instruction instructs Gemini to use memory only when directly relevant, leaving relevance judgment to the model rather than gating injection.
+
+### Memory lifecycle
+- Memories are **user-scoped** — they persist across all sessions and are never deleted when a chat session is deleted.
+- Memories are deleted only when the account itself is deleted (full cascade).
+- Users can view and manage stored memories in **Settings → AI Memory**.
+
+---
+
+## 🔍 Web Search
+
+NovaMind automatically runs real-time Tavily web search when a query requires current or time-sensitive information. The search pipeline uses an LLM to rewrite the user's query into an optimised search string before hitting the Tavily API, then injects the results into the user message body with strict grounding instructions for Gemini.
+
+Search results are prepended to the user message as a `=== Web Search Results ===` block. When this marker is present, `geminiService.js` appends strict grounding instructions to the system prompt: prioritise search facts over training data, do not hallucinate, do not include source URLs in the reply.
+
+---
+
 ## 📄 RAG Document Pipeline
 
 1. **Client** → requests a signed Cloudinary upload URL (`GET /api/upload/signature`)
@@ -181,20 +234,50 @@ chatbot-project/
 Supported file types: `jpg`, `jpeg`, `png`, `webp`, `gif`, `pdf`, `docx`, `doc`, `xlsx`, `xls`, `pptx`, `ppt`, `txt`, `csv`
 
 ### 🔒 Upload Limits & Rates
-- **Message limit**: Users can upload only up to **2 files in a single message**.
-- **Daily limit**: Users can upload up to **2 files of each document type** in a rolling 24-hour window. Document categories are:
-  - `pdf` (PDF documents)
-  - `word` (Word documents: `.docx`, `.doc`)
-  - `excel` (Spreadsheets and tabular data: `.xlsx`, `.xls`, `.csv`)
-  - `powerpoint` (Presentations: `.pptx`, `.ppt`)
-  - `text` (Plain text files: `.txt`)
-  - `image` (Images: `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif`)
+
+- **Per-message limit**: Maximum **2 files per message** (shared between images and documents).
+- **Daily document quota** (rolling 24-hour window, per user):
+
+| Category | Extensions | Daily limit |
+|---|---|---|
+| `pdf` | `.pdf` | 2 files |
+| `word` | `.docx`, `.doc` | 2 files |
+| `excel` | `.xlsx`, `.xls`, `.csv` | 2 files |
+| `powerpoint` | `.pptx`, `.ppt` | 2 files |
+| `text` | `.txt` | **Unlimited** |
+| `image` | `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif` | **Unlimited** |
+
+- **Images bypass the RAG pipeline entirely** — they are uploaded to Cloudinary and sent inline to Gemini Vision. No BullMQ job, no Pinecone upsert, and no daily quota is applied.
+- **Failed uploads do not count** against the daily quota.
+- **Quota is not refunded** on file or session deletion — it resets automatically after 24 hours.
+- **File size limit**: 10 MB per file.
+
+---
+
+## 🗑️ Account Deletion (Full Cascade)
+
+Deleting an account removes all associated data in parallel:
+
+| Data | Where |
+|---|---|
+| User document | MongoDB `users` collection |
+| All chat sessions | MongoDB `sessions` collection |
+| All messages | MongoDB `messages` collection |
+| All stored memories | MongoDB `memories` collection |
+| All file registry entries | MongoDB `fileregistries` collection |
+| All document chunks | MongoDB `documentchunks` collection |
+| All document manifests | MongoDB `documentmanifests` collection |
+| All uploaded files | Cloudinary CDN (by `publicId`) |
+| All vector embeddings | Pinecone index (by `userId` namespace/filter) |
+
+The deletion uses `Promise.allSettled` — individual failures are logged but do not block the rest of the cascade.
 
 ---
 
 ## ✨ Smart Features & Interaction
 
 * **Checkmark Copy Action**: Clicking any copy icon or button (for message logs, robot responses, or code snippets) changes the icon to a checkmark or `✓ Copied!` for 5 seconds. Copying is disabled during this period to prevent double-triggering. The copy action is fully restored after the 5-second timeout.
+* **Mobile Settings Access**: On viewports below 1024px, the header exposes a settings gear icon (⚙) that opens the full settings panel directly — no sidebar required.
 
 ---
 
@@ -209,6 +292,7 @@ Secured via `X-Metrics-Secret` header.
 | `active_sse_streams` | Gauge | Live streaming connections |
 | `mongodb_connections_active` | Gauge | Open connection pool size |
 | `gemini_model_usage_total` | Counter | API calls per Gemini model |
+| `memory_extractions_total` | Counter | Facts saved by the memory system |
 
 ---
 

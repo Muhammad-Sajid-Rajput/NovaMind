@@ -71,7 +71,7 @@ function ChatHeader() {
           aria-label="More options"
           title="Settings"
         >
-          <Icon icon="material-symbols:more-vert" />
+          <Icon icon="material-symbols:settings-outline-rounded" />
         </button>
       </div>
     </header>
