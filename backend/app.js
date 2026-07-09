@@ -62,8 +62,10 @@ app.use(
 );
 
 // ─── CORS ──────────────────────────────────────────────────────────────────────
+// ALLOWED_ORIGINS accepts a comma-separated list for multiple domains.
 const allowedOrigins = [
-  process.env.ALLOWED_ORIGIN || "http://localhost:5173",
+  ...(process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || "http://localhost:5173")
+    .split(",").map((o) => o.trim()),
   "http://localhost:4173", // Vite preview
 ];
 

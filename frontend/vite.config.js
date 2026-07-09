@@ -64,7 +64,7 @@ export default defineConfig({
       workbox: {
         // Pre-cache all build output files
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
-        navigateFallback: '/offline.html',
+        navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api/],
 
         // Runtime caching strategies for external resources

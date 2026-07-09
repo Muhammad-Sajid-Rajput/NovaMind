@@ -24,9 +24,9 @@ const setRefreshCookie = (res, token) => {
   res.cookie("refreshToken", token, {
     httpOnly: true,
     secure:   process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
     maxAge:   30 * 24 * 60 * 60 * 1000, // 30 days in ms
-    path:     "/api/auth/refresh",       // scoped path — cookie not sent on other routes
+    path:     "/",       // root path to allow cross-origin path consistency
   });
 };
 
@@ -34,8 +34,8 @@ const clearRefreshCookie = (res) => {
   res.clearCookie("refreshToken", {
     httpOnly: true,
     secure:   process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path:     "/api/auth/refresh",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+    path:     "/",
   });
 };
 

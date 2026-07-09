@@ -46,8 +46,8 @@ export const changePassword = asyncHandler(async (req, res) => {
   res.clearCookie("refreshToken", {
     httpOnly: true,
     secure:   process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path:     "/api/auth/refresh",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+    path:     "/",
   });
 
   logger.info("[ChangePassword] Password updated for user:", { userId: req.user.id });
@@ -188,8 +188,8 @@ export const deleteAccount = asyncHandler(async (req, res) => {
   res.clearCookie("refreshToken", {
     httpOnly: true,
     secure:   process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path:     "/api/auth/refresh",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+    path:     "/",
   });
 
   logger.info("[DeleteAccount] Account and all data deleted for user:", { userId });
