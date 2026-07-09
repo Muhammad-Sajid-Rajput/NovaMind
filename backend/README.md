@@ -50,8 +50,6 @@ backend/
 │       ├── queues/
 │       │   ├── ingestQueue.js   # BullMQ queue definition & job options
 │       │   └── ingestWorker.js  # Parse → chunk → embed → upsert worker pipeline
-│       ├── services/
-│       │   └── cancelService.js # Cloudinary delete + Pinecone vector cleanup
 │       └── utils/
 │           └── mimeValidator.js # Magic-byte file signature validation
 │

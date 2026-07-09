@@ -115,10 +115,10 @@ chatbot-project/
 │   │       │   └── FileRegistry.model.js  # Tracks ingest state per uploaded file
 │   │       ├── queues/
 │   │       │   ├── ingestQueue.js   # BullMQ queue definition
-│           │   └── cancelService.js # Cloudinary delete + Pinecone vector cleanup
-│           └── utils/
-│               └── mimeValidator.js # File signature / magic-byte validator
-│
+│   │       │   └── ingestWorker.js  # Parse → chunk → embed → upsert worker pipeline
+│   │       └── utils/
+│   │           └── mimeValidator.js # File signature / magic-byte validator
+│   │
 │   ├── routes/                      # Top-level Express router aggregator
 │
 └── frontend/                        # React + Vite SPA
@@ -141,8 +141,20 @@ chatbot-project/
             ├── auth/                # OTP registration & login screens
             ├── chat/                # Message list, streaming, file upload
             │   └── components/
-            │       ├── ChatInput.jsx    # Upload orchestration + localStorage persistence
-            │       └── FilePreview.jsx  # File card — uploading/retrying/done/failed states
+            │       ├── ChatHeader.jsx       # Session title bar & controls
+            │       ├── ChatInput.jsx        # Upload orchestration + localStorage persistence
+            │       ├── ChatMessage.jsx      # Individual message bubble renderer
+            │       ├── ChatMessages.jsx     # Message list container with scroll management
+            │       ├── CodeBlock.jsx        # Syntax-highlighted code block
+            │       ├── EditMessageBox.jsx   # Inline message edit UI
+            │       ├── FilePreview.jsx      # File card — uploading/retrying/done/failed states
+            │       ├── MainArea.jsx         # Chat layout shell
+            │       ├── MarkdownRenderer.jsx # Full markdown + KaTeX rendering pipeline
+            │       ├── MessageActions.jsx   # Copy, edit, regenerate action bar
+            │       ├── MessageList.jsx      # Virtualised message list wrapper
+            │       ├── ModelSelector.jsx    # AI model switcher dropdown
+            │       ├── VersionNavigator.jsx # Edit-version prev/next navigator
+            │       └── WelcomeScreen.jsx    # Empty-session welcome prompt grid
             ├── sessions/            # Sidebar, debounced search, session management
             └── settings/            # AI memory, theme, customization panels
 ```
@@ -362,15 +374,16 @@ npm run dev
 
 ## 🔒 Production Deployment
 
-### Backend → Railway
-1. Create a Railway project and add a **Redis** service.
-2. Link your GitHub repo and set **Root Directory** to `/backend`.
-3. Add all environment variables. Set `REDIS_URL` to the internal Railway Redis URL.
-4. Generate a public domain and update `ALLOWED_ORIGIN` to your Vercel URL.
+### Backend → Render
+1. Create a new **Web Service** on Render and link your GitHub repository.
+2. Set the **Root Directory** to `backend`, choose **Node** environment, set build command to `npm install`, and start command to `npm start`.
+3. Create a **Render Redis** instance (or use Redis Cloud / Upstash) and copy its connection URL.
+4. Add all environment variables from `backend/.env.example` in the Render environment settings (set `REDIS_URL` to your Redis connection URL).
+5. Set `ALLOWED_ORIGIN` to your Vercel frontend URL.
 
 ### Frontend → Vercel
-1. Import your GitHub repo in Vercel. Set **Framework Preset** to Vite, **Root Directory** to `frontend`.
-2. Add environment variable `VITE_API_URL` pointing to your Railway backend URL.
+1. Import your GitHub repository in Vercel. Set **Framework Preset** to Vite and the **Root Directory** to `frontend`.
+2. Add the environment variable `VITE_API_URL` pointing to your Render backend URL (e.g. `https://novamind-api.onrender.com`).
 3. Deploy — NovaMind is live.
 
 ### Docker (self-hosted)

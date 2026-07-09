@@ -30,8 +30,20 @@ frontend/
         ├── settings/         # Option sliders, model selector, user Memory UI
         └── chat/             # Message list, voice dictation, input tools
             └── components/
-                ├── ChatInput.jsx    # Handles input, file selection & localStorage upload states
-                └── FilePreview.jsx  # Renders files with upload/retry progress states
+                ├── ChatHeader.jsx       # Session title bar & controls
+                ├── ChatInput.jsx        # Upload orchestration + localStorage persistence
+                ├── ChatMessage.jsx      # Individual message bubble renderer
+                ├── ChatMessages.jsx     # Message list container with scroll management
+                ├── CodeBlock.jsx        # Syntax-highlighted code block
+                ├── EditMessageBox.jsx   # Inline message edit UI
+                ├── FilePreview.jsx      # File card — uploading/retrying/done/failed states
+                ├── MainArea.jsx         # Chat layout shell
+                ├── MarkdownRenderer.jsx # Full markdown + KaTeX rendering pipeline
+                ├── MessageActions.jsx   # Copy, edit, regenerate action bar
+                ├── MessageList.jsx      # Virtualised message list wrapper
+                ├── ModelSelector.jsx    # AI model switcher dropdown
+                ├── VersionNavigator.jsx # Edit-version prev/next navigator
+                └── WelcomeScreen.jsx    # Empty-session welcome prompt grid
 ```
 
 ---
