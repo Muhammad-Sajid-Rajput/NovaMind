@@ -149,8 +149,32 @@ export const retrieveContext = async ({
   // 4. Merge results using Reciprocal Rank Fusion (RRF)
   const mergedResults = rrfMerge(semanticMatches, lexicalMatches);
 
-  // 5. Context Compression (Selecting top unique context chunks and metadata coordinates)
-  const compressed = mergedResults.slice(0, topK);
+  // 5. Context Compression & Diversification (Round-robin selection across files)
+  let compressed = [];
+  const fileNames = [...new Set(mergedResults.map(r => r.fileName))];
+
+  if (fileNames.length > 1) {
+    const groups = {};
+    fileNames.forEach(name => {
+      groups[name] = mergedResults.filter(r => r.fileName === name);
+    });
+
+    let index = 0;
+    while (compressed.length < topK) {
+      let addedInRound = false;
+      for (const name of fileNames) {
+        if (groups[name] && groups[name].length > index) {
+          compressed.push(groups[name][index]);
+          addedInRound = true;
+          if (compressed.length >= topK) break;
+        }
+      }
+      if (!addedInRound) break; // All groups exhausted
+      index++;
+    }
+  } else {
+    compressed = mergedResults.slice(0, topK);
+  }
 
   logger.info('Hybrid RAG retrieval complete', {
     semanticCount: semanticMatches.length,

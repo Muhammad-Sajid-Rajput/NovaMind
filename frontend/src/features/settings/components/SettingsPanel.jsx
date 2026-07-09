@@ -362,7 +362,7 @@ function SettingsPanel() {
           </div>
 
           {/* Tab Content Panel */}
-          <div className="flex-1 overflow-y-auto pl-0 sm:pl-6 pr-1 flex flex-col gap-5.5 scrollbar-thin relative pb-2 select-none">
+          <div className={`flex-1 pl-0 sm:pl-6 pr-1 flex flex-col gap-5.5 scrollbar-thin relative pb-2 select-none ${activeTab === "memory" ? "overflow-hidden" : "overflow-y-auto"}`}>
             {/* Tab 1: General settings */}
             {activeTab === "general" && (
               <div className="flex flex-col gap-5 animate-in fade-in duration-200">
@@ -665,7 +665,7 @@ function SettingsPanel() {
 
             {/* Tab 3: AI Memory */}
             {activeTab === "memory" && (
-              <div className="flex flex-col gap-4.5 animate-in fade-in duration-200">
+              <div className="flex flex-col gap-4.5 animate-in fade-in duration-200 flex-1 min-h-0">
                 {/* Memory Header */}
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
@@ -700,7 +700,7 @@ function SettingsPanel() {
                 )}
 
                 {/* Memories List */}
-                <div className="flex flex-col gap-2 max-h-87.5 overflow-y-auto scrollbar-thin pr-1">
+                <div className="flex flex-col gap-2 overflow-y-auto scrollbar-thin pr-1 flex-1 min-h-0">
                   {memoriesLoading && (
                     <div className="flex items-center gap-2 py-6 text-xs text-text-muted justify-center">
                       <Icon icon="line-md:loading-twotone-loop" className="animate-spin text-base" />
@@ -744,32 +744,6 @@ function SettingsPanel() {
                     </div>
                   ))}
                 </div>
-
-                {/* Confirm Clear Modal Container */}
-                {confirmClearMemories && (
-                  <div className="flex items-center justify-between gap-3 rounded-2xl border p-4 animate-in zoom-in-95 duration-150" style={{ borderColor: "var(--color-border)", background: "rgba(255,255,255,0.01)" }}>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs font-bold text-text-primary">Clear all memories?</div>
-                      <p className="text-[11px] text-text-secondary mt-0.5 leading-normal">This will permanently delete all facts NovaMind has learned about you.</p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-border bg-transparent text-text-secondary hover:text-text-primary hover:bg-surface-hover cursor-pointer"
-                        onClick={() => setConfirmClearMemories(false)}
-                        disabled={isDeletingAllMemories}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        className="px-3 py-1.5 text-xs font-semibold rounded-xl border-none bg-error text-white hover:bg-error/95 disabled:opacity-50 cursor-pointer"
-                        onClick={handleDeleteAllMemories}
-                        disabled={isDeletingAllMemories}
-                      >
-                        {isDeletingAllMemories ? "Clearing..." : "Clear"}
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -867,6 +841,15 @@ function SettingsPanel() {
         confirmText="Log out"
         onConfirm={handleConfirmLogout}
         onCancel={() => setShowLogoutConfirm(false)}
+        isDangerous={true}
+      />
+      <ConfirmationModal
+        isOpen={confirmClearMemories}
+        title="Clear all memories?"
+        message="Are you sure you want to permanently delete all facts NovaMind has learned about you? This action is permanent and cannot be undone."
+        confirmText="Clear all"
+        onConfirm={handleDeleteAllMemories}
+        onCancel={() => setConfirmClearMemories(false)}
         isDangerous={true}
       />
     </div>

@@ -224,9 +224,7 @@ function Sidebar() {
               className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm text-text-secondary hover:text-text-primary hover:bg-surface-hover border border-border bg-transparent text-left cursor-pointer transition-colors"
               style={{ borderColor: "var(--color-border)" }}
             >
-              <div className="w-5 h-5 rounded-full border border-border flex items-center justify-center text-text-secondary">
-                <Icon icon="material-symbols:add" className="text-sm" />
-              </div>
+              <Icon icon="material-symbols:edit-square-outline" className="text-[17px]" />
               <span className="font-semibold">New chat</span>
             </button>
           </div>

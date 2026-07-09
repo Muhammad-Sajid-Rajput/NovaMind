@@ -505,7 +505,12 @@ function ChatInput() {
     try {
       const isImage = file.type.startsWith('image/');
       const resType = isImage ? 'image' : 'raw';
-      const sigData = await api.upload.getSignature();
+      const sigData = await api.upload.getSignature({
+        fileName: file.name,
+        fileType: file.type || 'application/octet-stream',
+        sessionId: currentSessionId,
+        messageId: tempMessageIdRef.current || undefined
+      });
       if (abortCtrl.signal.aborted) return;
 
       const formData = new FormData();
@@ -580,7 +585,7 @@ function ChatInput() {
   };
 
   // ── Poll a single BullMQ ingest job ─────────────────────────────────────────
-  const startSingleIngestPolling = (jobId, id) => {
+  const startSingleIngestPolling = (jobId, id, currentRetry = 0) => {
     let consecutiveErrors = 0;
     let localLastSeenProgress = 0;
 
@@ -589,6 +594,11 @@ function ChatInput() {
       delete pollingIntervalsRef.current[id];
       updateFileStateAndStorage(id, { uploadState: 'done', progress: 100 });
     };
+
+    // Clean up any existing interval for this file to prevent multiple polls running in parallel
+    if (pollingIntervalsRef.current[id]) {
+      clearInterval(pollingIntervalsRef.current[id]);
+    }
 
     const poll = setInterval(async () => {
       try {
@@ -604,7 +614,7 @@ function ChatInput() {
         } else if (status.status === 'failed') {
           clearInterval(poll);
           delete pollingIntervalsRef.current[id];
-          retrySingleIngest(id, `Ingest job failed: ${status.error || 'Unknown error'}`);
+          retrySingleIngest(id, `Ingest job failed: ${status.error || 'Unknown error'}`, currentRetry);
         }
       } catch (err) {
         // 404 after seeing progress = BullMQ cleaned up a completed job
@@ -620,7 +630,7 @@ function ChatInput() {
         if (consecutiveErrors >= 5) {
           clearInterval(poll);
           delete pollingIntervalsRef.current[id];
-          retrySingleIngest(id, 'Connection lost while tracking ingest progress.');
+          retrySingleIngest(id, 'Connection lost while tracking ingest progress.', currentRetry);
         }
       }
     }, POLL_INTERVAL_MS);
@@ -632,22 +642,14 @@ function ChatInput() {
       if (pollingIntervalsRef.current[id] === poll) {
         clearInterval(poll);
         delete pollingIntervalsRef.current[id];
-        retrySingleIngest(id, 'Ingest timed out.');
+        retrySingleIngest(id, 'Ingest timed out.', currentRetry);
       }
     }, POLL_TIMEOUT_MS);
   };
 
   // ── Auto-retry ingest (no Cloudinary re-upload) ──────────────────────────────
-  const retrySingleIngest = async (id, reason = '') => {
-    let currentItem;
-    setAttachedFiles(prev => {
-      currentItem = prev.find(f => f.id === id);
-      return prev;
-    });
-
-    if (!currentItem || !currentItem.ingestJobData) return;
-
-    if (currentItem.ingestRetryCount >= MAX_INGEST_RETRIES) {
+  const retrySingleIngest = async (id, reason = '', currentRetry = 0, isManual = false) => {
+    if (currentRetry >= MAX_INGEST_RETRIES) {
       console.warn(`[retrySingleIngest] giving up after ${MAX_INGEST_RETRIES} retries. Reason: ${reason}`);
       updateFileStateAndStorage(id, {
         uploadState: 'failed',
@@ -657,7 +659,7 @@ function ChatInput() {
       return;
     }
 
-    const nextRetryCount = currentItem.ingestRetryCount + 1;
+    const nextRetryCount = currentRetry + 1;
     updateFileStateAndStorage(id, {
       uploadState: 'retrying',
       ingestRetryCount: nextRetryCount,
@@ -665,8 +667,18 @@ function ChatInput() {
       error: '',
     });
 
-    // Exponential back-off: 2s, 4s, 6s
-    await new Promise(r => setTimeout(r, 2000 * nextRetryCount));
+    if (!isManual) {
+      // Exponential back-off: 2s, 4s, 6s
+      await new Promise(r => setTimeout(r, 2000 * nextRetryCount));
+    }
+
+    let currentItem;
+    setAttachedFiles(prev => {
+      currentItem = prev.find(f => f.id === id);
+      return prev;
+    });
+
+    if (!currentItem || !currentItem.ingestJobData) return;
 
     try {
       const ingestRes = await api.upload.ingest({
@@ -676,10 +688,10 @@ function ChatInput() {
       });
 
       updateFileStateAndStorage(id, { ingestJobId: ingestRes.jobId });
-      startSingleIngestPolling(ingestRes.jobId, id);
+      startSingleIngestPolling(ingestRes.jobId, id, nextRetryCount);
     } catch (err) {
       console.error('[retrySingleIngest] re-queue failed:', err.message);
-      retrySingleIngest(id, `Re-queue request failed: ${err.message}`);
+      retrySingleIngest(id, `Re-queue request failed: ${err.message}`, nextRetryCount);
     }
   };
 
@@ -765,7 +777,7 @@ function ChatInput() {
 
     if (currentItem.ingestJobData) {
       updateFileStateAndStorage(id, { ingestRetryCount: 0 });
-      retrySingleIngest(id, 'Manual retry by user');
+      retrySingleIngest(id, 'Manual retry by user', 0, true);
     } else {
       const originalFileObj = originalFilesMapRef.current[id];
       if (originalFileObj) {

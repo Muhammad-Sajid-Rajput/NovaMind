@@ -172,11 +172,13 @@ const processIngestJob = async (job) => {
     await updateRegistryStatus('Indexing');
 
     const vectors = structuredChunks.map((chunk, idx) => ({
-      id: `${messageId}-${idx}`,
+      id: `${registryId}-${idx}`,
       values: embeddings[idx],
       metadata: {
         userId,
         sessionId,
+        messageId,
+        fileId: registryId,
         fileUrl,
         fileName,
         text: chunk.text,
@@ -254,7 +256,9 @@ export const startIngestWorker = () => {
     processIngestJob,
     {
       connection: workerRedis,
-      concurrency: 2
+      concurrency: 2,
+      lockDuration: 180000, // 3 minutes lock duration (default is 30s)
+      maxStalledCount: 2   // Allow up to 2 stalls (default is 1)
     }
   );
 

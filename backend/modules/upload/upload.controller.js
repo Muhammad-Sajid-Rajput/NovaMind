@@ -9,9 +9,68 @@ import FileRegistry from './models/FileRegistry.model.js';
 import DocumentChunk from './models/DocumentChunk.model.js';
 import DocumentManifest from './models/DocumentManifest.model.js';
 
+// Reusable quota checker to enforce rules prior to and after uploads
+export const checkUploadQuota = async ({ userId, sessionId, messageId, fileName, fileType }) => {
+  // ── Limit 1: Max 2 files in one message ───────────────────────────────────────
+  if (messageId && sessionId && userId) {
+    const messageFilesCount = await FileRegistry.countDocuments({
+      userId,
+      sessionId,
+      messageId,
+      status: { $ne: 'Failed' }
+    });
+    if (messageFilesCount >= 2) {
+      throw new Error('You can only upload up to 2 files per message.');
+    }
+  }
+
+  // ── Limit 2: Max 2 files of each document type in 24 hours (Except text files) ───
+  if (fileName && fileType && userId) {
+    const docType = getDocumentType(fileName, fileType);
+    // Images do not go through RAG / ingestion, so they bypass document rate limit
+    if (docType !== 'text' && docType !== 'image' && docType !== 'other') {
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const registries = await FileRegistry.find({
+        userId,
+        createdAt: { $gte: oneDayAgo },
+        status: { $ne: 'Failed' }
+      });
+
+      let matchCount = 0;
+      for (const reg of registries) {
+        if (getDocumentType(reg.fileName) === docType) {
+          matchCount++;
+        }
+      }
+
+      if (matchCount >= 2) {
+        throw new Error(`Daily limit reached. You can only upload up to 2 files of type "${docType.toUpperCase()}" per day.`);
+      }
+    }
+  }
+};
+
 // GET /api/upload/signature
 // Returns signed parameters for Cloudinary direct client-side upload.
 export const getUploadSignature = asyncHandler(async (req, res) => {
+  const { fileName, fileType, sessionId, messageId } = req.query;
+  const userId = req.user.id;
+
+  // Enforce quota limits check BEFORE signing the request to prevent unnecessary Cloudinary storage use
+  if (fileName && fileType && sessionId) {
+    try {
+      await checkUploadQuota({
+        userId,
+        sessionId,
+        messageId,
+        fileName,
+        fileType
+      });
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+  }
+
   const timestamp = Math.floor(Date.now() / 1000);
   const folder    = "novamind_uploads";
 
@@ -88,43 +147,17 @@ export const ingestDocument = asyncHandler(async (req, res) => {
     });
   }
 
-  // ── Limit 1: Max 2 files in one message ───────────────────────────────────────
-  if (messageId) {
-    const messageFilesCount = await FileRegistry.countDocuments({
+  // Double check upload quota limits
+  try {
+    await checkUploadQuota({
       userId,
       sessionId,
       messageId,
-      status: { $ne: 'Failed' }
+      fileName,
+      fileType
     });
-    if (messageFilesCount >= 2) {
-      return res.status(400).json({
-        error: 'You can only upload up to 2 files per message.'
-      });
-    }
-  }
-
-  // ── Limit 2: Max 2 files of each document type in 24 hours (Except text files) ───
-  const docType = getDocumentType(fileName, fileType);
-  if (docType !== 'text') {
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const registries = await FileRegistry.find({
-      userId,
-      createdAt: { $gte: oneDayAgo },
-      status: { $ne: 'Failed' }
-    });
-
-    let matchCount = 0;
-    for (const reg of registries) {
-      if (getDocumentType(reg.fileName) === docType) {
-        matchCount++;
-      }
-    }
-
-    if (matchCount >= 2) {
-      return res.status(400).json({
-        error: `Daily limit reached. You can only upload up to 2 files of type "${docType.toUpperCase()}" per day.`
-      });
-    }
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
   }
 
   // Create FileRegistry entry in DB

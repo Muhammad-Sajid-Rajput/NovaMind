@@ -121,8 +121,15 @@ const handleResponse = async (response) => {
 };
 
 // ─── HTTP method helpers ──────────────────────────────────────────────────────
-const get = async (url) => {
-  const res = await fetchWithRefresh(url, {
+const get = async (url, params) => {
+  let targetUrl = url;
+  if (params) {
+    const qStr = new URLSearchParams(
+      Object.entries(params).filter(([_, v]) => v !== undefined && v !== null)
+    ).toString();
+    if (qStr) targetUrl = `${url}?${qStr}`;
+  }
+  const res = await fetchWithRefresh(targetUrl, {
     headers: { ...getAuthHeaders() },
   });
   return handleResponse(res);
@@ -189,7 +196,7 @@ export const api = {
     search: (q)            => get(`/chat/search?q=${encodeURIComponent(q)}`),
   },
   upload: {
-    getSignature:    ()      => get("/upload/signature"),
+    getSignature:    (params) => get("/upload/signature", params),
     ingest:          (body)  => post("/upload/ingest", body),
     getIngestStatus: (jobId) => get(`/upload/ingest/${jobId}`),
     cancel:          (body)  => post("/upload/cancel", body),
