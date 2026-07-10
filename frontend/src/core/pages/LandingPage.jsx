@@ -72,29 +72,38 @@ export default function LandingPage() {
         Skip to main content
       </a>
 
-      {/* ── Decorative glow orbs (z-0, purely ambient) ── */}
-      <div className="pointer-events-none absolute z-0 -top-[15%] -left-[10%] w-[55vw] h-[55vw] rounded-full bg-primary/10 blur-[130px]" />
-      <div className="pointer-events-none absolute z-0 -bottom-[15%] -right-[10%] w-[50vw] h-[50vw] rounded-full bg-blue-600/5 blur-[130px]" />
+      {/* ── Background Image Layer with gradient fade ── */}
+      <div
+        className="pointer-events-none fixed top-0 left-0 w-full h-screen z-0 opacity-15"
+        style={{
+          backgroundImage: "url('/background.webp')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          maskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%)",
+          WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%)",
+        }}
+      />
 
       {/* ──────────── HEADER ──────────── */}
       <header className="sticky top-0 z-20 w-full border-b border-border/40 bg-background/70 backdrop-blur-md">
-        <div className="w-full max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="w-full max-w-7xl mx-auto px-6 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
             <img
               src="/favicon.webp"
               alt="NovaMind"
-              className="w-9 h-9 rounded-full object-cover shadow-lg shadow-primary/20 shrink-0"
+              className="w-8 h-8 rounded-full object-cover shadow-lg shadow-primary/20 shrink-0"
             />
-            <span className="font-display text-lg font-bold tracking-tight">
+            <span className="font-display text-base font-bold tracking-tight">
               NovaMind
             </span>
           </div>
 
-          <nav className="flex items-center gap-3">
+          <nav className="flex items-center gap-2.5">
             {isLoggedIn ? (
               <button
                 onClick={() => setShowLogoutConfirm(true)}
-                className="min-h-[44px] inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl border border-error/25 bg-error/5 text-error hover:bg-error/10 hover:text-red-400 cursor-pointer transition-all duration-200 motion-reduce:transition-none shadow-sm shadow-error/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-error/40"
+                className="min-h-[36px] inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl border border-error/25 bg-error/5 text-error hover:bg-error/10 hover:text-red-400 cursor-pointer transition-all duration-200 motion-reduce:transition-none shadow-sm shadow-error/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-error/40"
               >
                 <Icon icon="mdi:logout" className="text-base" aria-hidden="true" />
                 Sign Out
@@ -103,13 +112,13 @@ export default function LandingPage() {
               <>
                 <Link
                   to="/auth/login"
-                  className="min-h-[44px] inline-flex items-center px-4 py-2 text-xs font-semibold rounded-xl text-text-secondary hover:text-text-primary transition-all motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  className="min-h-[36px] inline-flex items-center px-3.5 py-1.5 text-xs font-semibold rounded-xl text-text-secondary hover:text-text-primary transition-all motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 >
                   Sign In
                 </Link>
                 <Link
                   to="/auth/register"
-                  className="min-h-[44px] inline-flex items-center px-4 py-2 text-xs font-semibold rounded-xl bg-primary text-white hover:bg-primary-hover transition-all motion-reduce:transition-none shadow-md shadow-primary/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  className="min-h-[36px] inline-flex items-center px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-primary text-white hover:bg-primary-hover transition-all motion-reduce:transition-none shadow-md shadow-primary/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 >
                   Sign Up
                 </Link>
@@ -280,7 +289,7 @@ export default function LandingPage() {
       </main>
 
       {/* ──────────── FOOTER ──────────── */}
-      <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-7 border-t border-border/40 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-text-secondary">
+      <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-4 border-t border-border/40 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-text-secondary">
         <span>
           &copy; {new Date().getFullYear()} NovaMind AI. All rights reserved.
         </span>
@@ -288,7 +297,7 @@ export default function LandingPage() {
           href="https://muhammadsajid.dev"
           target="_blank"
           rel="noopener noreferrer"
-          className="min-h-[44px] inline-flex items-center gap-1.5 hover:text-text-primary transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-md px-2"
+          className="min-h-[36px] inline-flex items-center gap-1.5 hover:text-text-primary transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-md px-2"
         >
           <Icon icon="mdi:code-tags" className="text-base" aria-hidden="true" />
           Built by Muhammad Sajid

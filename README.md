@@ -1,5 +1,9 @@
 # ✦ NovaMind — Enterprise-Grade Full-Stack AI Chatbot
 
+<p align="center">
+  <img src="./novamind_banner.png" alt="NovaMind Banner" width="100%">
+</p>
+
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-blue.svg)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/react-18.x-61DAFB.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/vite-8.x-646CFF.svg)](https://vitejs.dev/)
