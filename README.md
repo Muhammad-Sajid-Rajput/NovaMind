@@ -17,55 +17,9 @@ NovaMind is a production-hardened full-stack AI chatbot platform. It combines a 
 
 ## 🏛️ System Architecture
 
-```mermaid
-graph TD
-    User([Client Browser])
-
-    subgraph Frontend["Frontend (Vercel)"]
-        Vite[React SPA / Vite 8]
-        PWA[PWA Service Worker]
-        KaTeX[KaTeX Math Engine]
-    end
-
-    subgraph Backend["Backend (Render)"]
-        Express[Express.js + SSE]
-        Pino[Pino JSON Logger]
-        Metrics[Prometheus Registry]
-        BullMQ[BullMQ Ingest Worker]
-    end
-
-    subgraph Data["Database Layer"]
-        MongoDB[(MongoDB Atlas)]
-        Redis[(Upstash Redis)]
-        Pinecone[(Pinecone Vector DB)]
-    end
-
-    subgraph External["External Services"]
-        Gemini[Gemini API — 3-Key Rotation]
-        Tavily[Tavily Web Search]
-        Cloudinary[Cloudinary CDN]
-        Resend[Resend Email OTP]
-    end
-
-    User -->|HTTPS| Vite
-    Vite --> PWA
-    Vite --> KaTeX
-    Vite -->|REST / SSE| Express
-    Express --> Pino
-    Express --> Metrics
-
-    Express --> MongoDB
-    Express --> Redis
-    Express --> Pinecone
-    Express --> Cloudinary
-    Express --> Gemini
-    Express --> Tavily
-    Express --> Resend
-
-    Redis -->|Ingest Jobs| BullMQ
-    BullMQ --> Gemini
-    BullMQ --> Pinecone
-```
+<p align="center">
+  <img src="./novamind_architecture.png" alt="NovaMind System Architecture" width="100%">
+</p>
 
 ---
 
