@@ -1,26 +1,22 @@
 // NovaMind — WelcomeScreen.jsx — Responsive
+import ChatInput from './ChatInput.jsx';
 
 function WelcomeScreen() {
   const chips = [
     {
-      label: "Ask a question",
-      prompt: "I have a question about...",
-      tooltip: "Ask NovaMind a question"
+      label: "Analyze PDF",
+      prompt: "Help me analyze this PDF document...",
+      tooltip: "Upload and analyze a PDF file"
     },
     {
-      label: "Learn something",
-      prompt: "Explain...",
-      tooltip: "Explain a concept or learn something new"
+      label: "Write",
+      prompt: "Help me write content for...",
+      tooltip: "Generate essays, articles, or emails"
     },
     {
-      label: "Get coding help",
-      prompt: "Help me with code...",
-      tooltip: "Get help with coding and debugging"
-    },
-    {
-      label: "Create content",
-      prompt: "Help me write...",
-      tooltip: "Generate creative content and ideas"
+      label: "Code",
+      prompt: "Help me write code to...",
+      tooltip: "Get programming and debugging assistance"
     }
   ];
 
@@ -31,47 +27,46 @@ function WelcomeScreen() {
   }
 
   return (
-    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center px-6 text-center select-none pointer-events-none">
-      <div className="w-full md:max-w-190 lg:max-w-200 xl:max-w-210 flex flex-col items-center justify-center pointer-events-auto">
+    <div className="absolute inset-0 z-10 overflow-hidden flex flex-col items-center justify-center px-6 text-center select-none pointer-events-none">
+      <div className="relative z-10 w-full md:max-w-190 lg:max-w-200 xl:max-w-210 flex flex-col items-center justify-center pointer-events-auto">
         {/* Brand Banner */}
-        <div className="flex items-center justify-center gap-4 sm:gap-6 mb-6 select-none animate-in fade-in duration-300">
+        <div className="flex flex-col items-center justify-center mb-6 select-none animate-in fade-in duration-300">
           <img
             src="/favicon.webp"
             alt="NovaMind Logo"
-            className="w-16 h-16 sm:w-24 sm:h-24 md:w-28 md:h-28 object-contain"
+            className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-contain mb-4"
           />
-          <div 
-            className="h-12 sm:h-16 md:h-20 w-px" 
-            style={{ backgroundColor: "var(--color-border)" }}
-          />
-          <div className="flex flex-col items-start text-left">
-            <span 
-              className="font-display text-text-primary leading-none tracking-wide text-2xl sm:text-3xl md:text-4xl"
-              style={{ fontWeight: 700 }}
-            >
-              NovaMind
-            </span>
-            <span 
-              className="font-sans text-text-secondary mt-1 uppercase tracking-wider text-[11px] sm:text-xs md:text-sm"
-              style={{ fontWeight: 500 }}
-            >
-              AI Assistant
-            </span>
-            <span 
-              className="font-sans text-text-muted mt-1 uppercase tracking-widest text-[8px] sm:text-[9px] md:text-[10px]"
-              style={{ fontWeight: 400 }}
-            >
-              Powered by Gemini
-            </span>
-          </div>
+          <span 
+            className="font-display text-text-primary leading-none tracking-wide text-2xl sm:text-3xl md:text-4xl text-center"
+            style={{ fontWeight: 700 }}
+          >
+            NovaMind
+          </span>
+          <span 
+            className="font-sans text-text-secondary mt-1.5 uppercase tracking-wider text-[11px] sm:text-xs md:text-sm text-center"
+            style={{ fontWeight: 500 }}
+          >
+            AI Assistant
+          </span>
+          <span 
+            className="font-sans text-text-muted mt-1 uppercase tracking-widest text-[8px] sm:text-[9px] md:text-[10px] text-center"
+            style={{ fontWeight: 400 }}
+          >
+            Powered by Gemini
+          </span>
         </div>
 
         {/* Greeting */}
         <h1
           className="font-sans text-text-primary mb-3 leading-tight text-xl sm:text-2xl lg:text-3xl font-medium"
         >
-          How can I help you today?
+          How can I help today?
         </h1>
+
+        {/* Input box */}
+        <div className="w-[95%] sm:w-full max-w-[600px] my-3 pointer-events-auto">
+          <ChatInput />
+        </div>
 
         {/* Suggestion chips */}
         <div className="flex flex-wrap sm:flex-nowrap justify-center gap-2.5 mt-6 max-w-150 sm:max-w-none w-full px-4 select-none">

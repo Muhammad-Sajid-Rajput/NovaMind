@@ -19,13 +19,7 @@ function ChatHeader() {
   const sessionName = currentSession ? currentSession.name : "New Chat";
 
   return (
-    <header
-      className="h-13 flex items-center justify-between px-3 z-30 transition-colors duration-300 relative"
-      style={{
-        backgroundColor: "var(--color-background)",
-        borderBottom: "1px solid var(--color-border)"
-      }}
-    >
+    <header className="h-13 flex items-center justify-between px-3 z-30 transition-colors duration-300 relative">
       <div className="flex items-center gap-2 min-w-0">
         {/* Toggle Sidebar / Hamburger Button */}
         <button

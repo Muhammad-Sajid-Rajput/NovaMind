@@ -6,6 +6,7 @@ import ChatMessages from "./ChatMessages.jsx";
 import ChatInput from "./ChatInput.jsx";
 import SettingsPanel from "../../settings/components/SettingsPanel.jsx";
 import ShortcutsModal from "../../settings/components/ShortcutsModal.jsx";
+import WelcomeScreen from "./WelcomeScreen.jsx";
 import { useChatContext } from "../context/ChatContext.jsx";
 
 function MainArea() {
@@ -22,9 +23,20 @@ function MainArea() {
   } = useChatContext();
 
   const currentMessages = chatMessages[currentSessionId] || [];
+  const hasMessages = currentMessages.length > 0;
 
   return (
     <main className="flex flex-col h-full relative overflow-hidden bg-background flex-1">
+      {/* Background radial depth lighting */}
+      <div className="absolute inset-0 z-0 welcome-radial-lighting pointer-events-none" />
+
+      {/* Floating gradient glows */}
+      <div className="welcome-glow-purple pointer-events-none" />
+      <div className="welcome-glow-blue pointer-events-none" />
+
+      {/* Technical grid */}
+      <div className="absolute inset-0 z-0 welcome-bg-grid pointer-events-none" />
+
       {/* top chat header */}
       <ChatHeader />
 
@@ -67,7 +79,10 @@ function MainArea() {
       <ChatMessages />
 
       {/* Message input bar */}
-      <ChatInput />
+      {hasMessages && <ChatInput />}
+
+      {/* Full-screen Welcome Screen */}
+      {!hasMessages && <WelcomeScreen />}
 
       {/* Modals & panels rendering */}
       {isSettingsOpen && <SettingsPanel />}

@@ -857,7 +857,7 @@ function ChatInput() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="chat-input-area px-4 py-2 bg-background md:max-w-190 lg:max-w-200 xl:max-w-210 w-full mx-auto flex flex-col z-30 select-none pb-0">
+    <div className="chat-input-area px-4 py-2 bg-transparent md:max-w-190 lg:max-w-200 xl:max-w-210 w-full mx-auto flex flex-col z-30 select-none pb-0">
       {countdown > 0 && (
         <div className="border p-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2 mb-3 animate-pulse bg-error/10 border-error/20 text-error" role="alert">
           <Icon icon="material-symbols:hourglass-bottom-rounded" className="text-lg" />
@@ -912,6 +912,7 @@ function ChatInput() {
           rows={1}
           style={{ padding: attachedFiles.length > 0 ? '8px 12px 10px' : '12px 12px' }}
           aria-label="Chat Message Input"
+          autoFocus
         />
 
         {/* Bottom toolbar */}

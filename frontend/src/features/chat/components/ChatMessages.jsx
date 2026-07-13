@@ -2,22 +2,20 @@
 import { useCallback } from 'react';
 import { Icon } from '@iconify/react';
 import { useChatContext } from '../context/ChatContext.jsx';
-import { useChatScroll }  from '../hooks/useChatScroll.js';
-import MessageList        from './MessageList.jsx';
-import WelcomeScreen      from './WelcomeScreen.jsx';
-import { api }            from '../../../config/api.js';
+import { useChatScroll } from '../hooks/useChatScroll.js';
+import MessageList from './MessageList.jsx';
+import { api } from '../../../config/api.js';
 
 function ChatMessages() {
   const {
     chatMessages,
     setChatMessages,
     currentSessionId,
-    editingMessageId,
     setEditingMessageId,
   } = useChatContext();
 
   const currentMessages = chatMessages[currentSessionId] || [];
-  const hasMessages     = currentMessages.length > 0;
+  const hasMessages = currentMessages.length > 0;
 
   // ── Smart scroll hook ──────────────────────────────
   const {
@@ -26,10 +24,10 @@ function ChatMessages() {
     userScrolledUp,
     scrollToBottom,
   } = useChatScroll({
-    messages:         currentMessages,
+    messages: currentMessages,
     currentSessionId,
     isStreaming: currentMessages[currentMessages.length - 1]
-                   ?.isStreaming ?? false,
+      ?.isStreaming ?? false,
   });
 
   // ── Code copy (event delegation) ──────────────────
@@ -52,13 +50,13 @@ function ChatMessages() {
   const handleRegenerate = useCallback(() => {
     setChatMessages((prev) => {
       const sessionMsgs = prev[currentSessionId] || [];
-      const lastBotIdx  = [...sessionMsgs]
+      const lastBotIdx = [...sessionMsgs]
         .reverse()
         .findIndex(m => m.sender === 'robot');
       if (lastBotIdx === -1) return prev;
       const botIdx = sessionMsgs.length - 1 - lastBotIdx;
-      const prevMessages  = sessionMsgs.slice(0, botIdx);
-      const lastUserMsg   = [...prevMessages]
+      const prevMessages = sessionMsgs.slice(0, botIdx);
+      const lastUserMsg = [...prevMessages]
         .reverse()
         .find(m => m.sender === 'user');
       if (!lastUserMsg) return prev;
@@ -66,12 +64,14 @@ function ChatMessages() {
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent(
           'auto-send-chat-message',
-          { detail: {
-            text:        lastUserMsg.message,
-            file:        lastUserMsg.file || null,
-            isRagSession:!!lastUserMsg.file,
-            skipAppend:  true,
-          }}
+          {
+            detail: {
+              text: lastUserMsg.message,
+              file: lastUserMsg.file || null,
+              isRagSession: !!lastUserMsg.file,
+              skipAppend: true,
+            }
+          }
         ));
       }, 50);
 
@@ -85,8 +85,8 @@ function ChatMessages() {
     const msgIndex = messages.findIndex(m => m.id === messageId);
     if (msgIndex === -1) return;
 
-    const botResponseIndex  = msgIndex + 1;
-    const currentUserMsg    = messages[msgIndex];
+    const botResponseIndex = msgIndex + 1;
+    const currentUserMsg = messages[msgIndex];
     const currentBotResponse = messages[botResponseIndex];
 
     const currentVersionEntry = {
@@ -100,7 +100,7 @@ function ChatMessages() {
       : [currentVersionEntry];
 
     const newVersionIndex = updatedVersions.length;
-    const finalVersions   = [
+    const finalVersions = [
       ...updatedVersions,
       { userMessage: newText, botResponse: null },
     ];
@@ -108,8 +108,8 @@ function ChatMessages() {
     const messagesBefore = messages.slice(0, msgIndex);
     const updatedUserMsg = {
       ...currentUserMsg,
-      message:             newText,
-      versions:            finalVersions,
+      message: newText,
+      versions: finalVersions,
       currentVersionIndex: newVersionIndex,
     };
 
@@ -138,8 +138,8 @@ function ChatMessages() {
       const msgIndex = messages.findIndex(m => m.id === messageId);
       if (msgIndex === -1) return prev;
 
-      const msg         = messages[msgIndex];
-      const fromIndex   = msg.currentVersionIndex;
+      const msg = messages[msgIndex];
+      const fromIndex = msg.currentVersionIndex;
       const targetVersion = msg.versions[newIndex];
       const currentSubsequent = messages.slice(msgIndex + 2);
 
@@ -158,8 +158,8 @@ function ChatMessages() {
 
       const updatedMsg = {
         ...msg,
-        message:             targetVersion.userMessage,
-        versions:            updatedVersions,
+        message: targetVersion.userMessage,
+        versions: updatedVersions,
         currentVersionIndex: newIndex,
       };
 
@@ -178,7 +178,7 @@ function ChatMessages() {
 
   // ── Render ─────────────────────────────────────────
   return (
-    <div className="flex-1 flex flex-col bg-background
+    <div className="flex-1 flex flex-col bg-transparent
                     overflow-hidden relative w-full h-full">
 
       {/* Scroll container */}
@@ -191,9 +191,6 @@ function ChatMessages() {
       >
         {/* Top spacer */}
         <div className="h-4 shrink-0" />
-
-        {/* Welcome screen */}
-        {!hasMessages && <WelcomeScreen />}
 
         {/* Memoized message list */}
         {hasMessages && (
@@ -223,7 +220,7 @@ function ChatMessages() {
           aria-label="Jump to latest message"
         >
           <Icon icon="material-symbols:arrow-downward-rounded"
-                className="text-xl" />
+            className="text-xl" />
         </button>
       )}
     </div>

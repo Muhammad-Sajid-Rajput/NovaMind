@@ -107,10 +107,6 @@
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-primary);
-  background-image: radial-gradient(circle at 1px 1px,
-      rgba(124, 58, 237, 0.07) 1px,
-      transparent 0);
-  background-size: 32px 32px;
   color: var(--color-text-primary);
   min-height: 100vh;
   width: 100%;
@@ -1031,25 +1027,7 @@ button,
   }
 }
 
-/* 11. Welcome screen logo glow */
-.welcome-logo-container {
-  position: relative;
-}
 
-.welcome-logo-container::before {
-  content: '';
-  position: absolute;
-  width: 140px;
-  height: 140px;
-  background: radial-gradient(circle, rgba(124, 58, 237, 0.28) 0%, transparent 70%);
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  filter: blur(20px);
-  z-index: 0;
-  pointer-events: none;
-}
 
 /* 12. Autofill Style Overrides */
 input:-webkit-autofill,
@@ -1236,5 +1214,83 @@ input:-webkit-autofill:active {
     /* IE and Edge */
     scrollbar-width: none !important;
     /* Firefox */
+  }
+}
+
+/* ── Welcome Screen Background Upgrades ── */
+.welcome-radial-lighting {
+  background: radial-gradient(circle at center, rgba(124, 58, 237, 0.08) 0%, transparent 75%);
+}
+
+.welcome-glow-purple {
+  position: absolute;
+  top: -15%;
+  right: -15%;
+  width: 70vw;
+  height: 70vw;
+  max-width: 800px;
+  max-height: 800px;
+  min-width: 400px;
+  min-height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.22) 0%, transparent 75%);
+  filter: blur(120px);
+  animation: float-glow-purple 30s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.welcome-glow-blue {
+  position: absolute;
+  bottom: -15%;
+  left: -15%;
+  width: 70vw;
+  height: 70vw;
+  max-width: 800px;
+  max-height: 800px;
+  min-width: 400px;
+  min-height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(79, 140, 255, 0.17) 0%, transparent 75%);
+  filter: blur(120px);
+  animation: float-glow-blue 30s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.welcome-bg-grid {
+  background-image: 
+    linear-gradient(to right, rgba(124, 58, 237, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(124, 58, 237, 0.08) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at center, black 40%, transparent 90%);
+  -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 90%);
+  animation: move-grid 45s linear infinite;
+}
+
+@keyframes move-grid {
+  from {
+    background-position-y: 0px;
+  }
+  to {
+    background-position-y: -44px;
+  }
+}
+
+@keyframes float-glow-purple {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-15px, 15px);
+  }
+}
+
+@keyframes float-glow-blue {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(15px, -15px);
   }
 }
