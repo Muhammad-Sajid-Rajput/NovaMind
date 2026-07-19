@@ -134,7 +134,6 @@ function ChatMessage({
                       className="inline-flex max-w-full rounded-lg mb-1.5 shadow-sm border"
                       style={{
                         borderColor: "var(--color-border)",
-                        background: "rgba(0,0,0,0.12)",
                       }}
                     >
                       <img
@@ -161,7 +160,6 @@ function ChatMessage({
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-2 rounded-xl border transition-all duration-200 select-none mb-1.5 max-w-full w-fit text-left self-end"
                     style={{
-                      background: "rgba(255,255,255,0.06)",
                       borderColor: "rgba(255,255,255,0.1)",
                       textDecoration: "none",
                     }}
@@ -196,17 +194,19 @@ function ChatMessage({
               />
             </div>
           ) : (
-            <div className="relative p-3.5 px-4 rounded-[18px_18px_4px_18px] bg-user-bubble text-white shadow-xs flex flex-col gap-1.5 transition-all duration-300 w-fit max-w-full min-w-0 group self-end">
+            <div className="flex flex-col gap-2 items-end w-full">
               {filesList.map((f, i) => {
                 const isImg = f.mimeType?.startsWith('image/') || f.resourceType === 'image';
                 if (isImg) {
                   return (
-                    <div
+                    <a
                       key={f.url || i}
-                      className="inline-flex max-w-full rounded-lg mb-1.5 shadow-sm border"
+                      href={f.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex max-w-full rounded-xl shadow-sm border self-end overflow-hidden hover:opacity-90 transition-opacity duration-200 cursor-pointer"
                       style={{
-                        borderColor: "var(--color-border)",
-                        background: "rgba(0,0,0,0.12)",
+                        borderColor: "rgba(255,255,255,0.1)",
                       }}
                     >
                       <img
@@ -222,7 +222,7 @@ function ChatMessage({
                           borderRadius: "inherit",
                         }}
                       />
-                    </div>
+                    </a>
                   );
                 }
                 return (
@@ -231,19 +231,10 @@ function ChatMessage({
                     href={f.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-2 rounded-xl border transition-all duration-200 select-none mb-1.5 max-w-full w-fit text-left self-start"
+                    className="flex items-center gap-3 p-3 rounded-[18px_18px_4px_18px] border text-white shadow-xs transition-all duration-300 w-fit max-w-full text-left self-end hover:brightness-110 active:scale-[0.98]"
                     style={{
-                      background: "rgba(255,255,255,0.06)",
                       borderColor: "rgba(255,255,255,0.1)",
                       textDecoration: "none",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.1)";
-                      e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-                      e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
                     }}
                   >
                     <div
@@ -269,9 +260,13 @@ function ChatMessage({
                   </a>
                 );
               })}
-              <span className="block max-w-full text-[14.5px] leading-relaxed wrap-break-word font-sans select-text whitespace-pre-wrap">
-                {renderUserText()}
-              </span>
+              {message && message.trim() !== "" && (
+                <div className="relative p-3.5 px-4 rounded-[18px_18px_4px_18px] bg-user-bubble text-white shadow-xs flex flex-col gap-1.5 transition-all duration-300 w-fit max-w-full min-w-0 group self-end">
+                  <span className="block max-w-full text-[14.5px] leading-relaxed wrap-break-word font-sans select-text whitespace-pre-wrap">
+                    {renderUserText()}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
