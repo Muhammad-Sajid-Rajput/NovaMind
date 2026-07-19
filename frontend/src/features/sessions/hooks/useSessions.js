@@ -57,6 +57,7 @@ export function useSessions(setChatMessages, chatMessages) {
                 id,
                 image: m.image ?? local?.image ?? null,
                 file: m.file ?? local?.file ?? null,
+                files: m.files ?? local?.files ?? [],
               };
             });
             return {

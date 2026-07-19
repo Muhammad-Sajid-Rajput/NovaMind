@@ -68,7 +68,8 @@ function ChatMessages() {
             detail: {
               text: lastUserMsg.message,
               file: lastUserMsg.file || null,
-              isRagSession: !!lastUserMsg.file,
+              files: lastUserMsg.files || [],
+              isRagSession: !!((lastUserMsg.files || []).some(f => !f.mimeType?.startsWith('image/'))),
               skipAppend: true,
             }
           }
@@ -127,7 +128,15 @@ function ChatMessages() {
 
     window.dispatchEvent(new CustomEvent(
       'auto-send-chat-message',
-      { detail: { text: newText, skipAppend: true } }
+      {
+        detail: {
+          text: newText,
+          file: currentUserMsg.file || null,
+          files: currentUserMsg.files || [],
+          isRagSession: !!((currentUserMsg.files || []).some(f => !f.mimeType?.startsWith('image/'))),
+          skipAppend: true
+        }
+      }
     ));
   }, [currentSessionId, chatMessages, setChatMessages, setEditingMessageId]);
 
