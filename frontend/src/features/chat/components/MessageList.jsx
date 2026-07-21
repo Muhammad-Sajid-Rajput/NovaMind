@@ -26,6 +26,7 @@ const MessageList = memo(({
           message={msg.message}
           sender={msg.sender}
           time={msg.time}
+          createdAt={msg.createdAt}
           image={msg.image}
           file={msg.file}
           files={msg.files}

@@ -4,7 +4,6 @@ import { Icon } from "@iconify/react";
 import { useChatContext } from "../context/ChatContext.jsx";
 import MessageActions from "./MessageActions.jsx";
 import EditMessageBox from "./EditMessageBox.jsx";
-import VersionNavigator from "./VersionNavigator.jsx";
 
 const MarkdownRenderer = lazy(() => import("./MarkdownRenderer.jsx"));
 
@@ -41,6 +40,7 @@ function ChatMessage({
   message,
   sender,
   time,
+  createdAt,
   image,
   file,
   isStreaming,
@@ -76,6 +76,18 @@ function ChatMessage({
       return next;
     });
   };
+
+  const userBubbleRef = useRef(null);
+  const [capturedBubbleWidth, setCapturedBubbleWidth] = useState(null);
+
+  useEffect(() => {
+    if (!isEditing && userBubbleRef.current) {
+      const rect = userBubbleRef.current.getBoundingClientRect();
+      if (rect.width > 0) {
+        setCapturedBubbleWidth(rect.width);
+      }
+    }
+  }, [isEditing, message]);
 
   useEffect(() => {
     return () => {
@@ -191,6 +203,7 @@ function ChatMessage({
                 originalText={message}
                 onSubmit={(newText) => onEditSubmit(id, newText)}
                 onCancel={() => setEditingMessageId(null)}
+                initialWidth={capturedBubbleWidth}
               />
             </div>
           ) : (
@@ -261,7 +274,7 @@ function ChatMessage({
                 );
               })}
               {message && message.trim() !== "" && (
-                <div className="relative p-3.5 px-4 rounded-[18px_18px_4px_18px] bg-user-bubble text-white shadow-xs flex flex-col gap-1.5 transition-all duration-300 w-fit max-w-full min-w-0 group self-end">
+                <div ref={userBubbleRef} className="relative p-3.5 px-4 rounded-[18px_18px_4px_18px] bg-user-bubble text-white shadow-xs flex flex-col gap-1.5 transition-all duration-300 w-fit max-w-full min-w-0 group self-end">
                   <span className="block max-w-full text-[14.5px] leading-relaxed wrap-break-word font-sans select-text whitespace-pre-wrap">
                     {renderUserText()}
                   </span>
@@ -271,19 +284,16 @@ function ChatMessage({
           )}
 
           {!isEditing && (
-            <>
-              <VersionNavigator
-                message={{ id, _id: id, versionInfo, parentMessageId }}
-                onNavigate={onNavigate}
-              />
-              <MessageActions
-                id={id}
-                message={message}
-                sender={sender}
-                time={time}
-                isTouched={isTouched}
-              />
-            </>
+            <MessageActions
+              id={id}
+              message={message}
+              sender={sender}
+              time={time}
+              createdAt={createdAt}
+              isTouched={isTouched}
+              versionInfo={versionInfo}
+              onNavigate={onNavigate}
+            />
           )}
         </div>
       </div>

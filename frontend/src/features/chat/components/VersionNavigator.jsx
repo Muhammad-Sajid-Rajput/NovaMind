@@ -5,7 +5,7 @@ import React from "react";
 
 const VersionNavigator = ({ 
   message, 
-  onNavigate  // (messageId, targetChildId) => void
+  onNavigate // (messageId, targetChildId) => void
 }) => {
   const { versionInfo } = message;
   
@@ -31,24 +31,32 @@ const VersionNavigator = ({
   };
 
   return (
-    <div className="version-nav flex items-center gap-1 justify-end mt-1 select-none">
+    <div className="version-nav flex items-center gap-0 select-none opacity-100">
       <button
         onClick={handlePrev}
         disabled={isFirst}
-        className={`version-btn ${isFirst ? "opacity-30 cursor-not-allowed" : "hover:text-text-primary cursor-pointer"}`}
+        className={`w-5.5 h-5.5 flex items-center justify-center rounded-md bg-transparent border-none text-[11px] font-sans transition-colors duration-150 focus:outline-none ${
+          isFirst 
+            ? "text-text-muted/30 cursor-not-allowed" 
+            : "text-text-muted hover:text-text-primary hover:bg-surface-hover cursor-pointer"
+        }`}
         aria-label="Previous version"
       >
         &lt;
       </button>
       
-      <span className="text-xs text-text-muted font-mono select-none">
+      <span className="text-[10.5px] text-text-muted/80 font-medium select-none px-0.5">
         {current} / {total}
       </span>
       
       <button
         onClick={handleNext}
         disabled={isLast}
-        className={`version-btn ${isLast ? "opacity-30 cursor-not-allowed" : "hover:text-text-primary cursor-pointer"}`}
+        className={`w-5.5 h-5.5 flex items-center justify-center rounded-md bg-transparent border-none text-[11px] font-sans transition-colors duration-150 focus:outline-none ${
+          isLast 
+            ? "text-text-muted/30 cursor-not-allowed" 
+            : "text-text-muted hover:text-text-primary hover:bg-surface-hover cursor-pointer"
+        }`}
         aria-label="Next version"
       >
         &gt;

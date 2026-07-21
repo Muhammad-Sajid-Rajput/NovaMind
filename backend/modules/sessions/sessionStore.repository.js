@@ -279,11 +279,14 @@ export const SessionStore = {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
+    const formattedTime = new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hourCycle: "h12" });
+
     const newNode = await Message.create({
       sessionId,
       userId,
       sender: "user",
       message: newText,
+      time: editedMessage.time || formattedTime,
       file: file !== undefined ? file : editedMessage.file,
       files: files !== undefined ? files : editedMessage.files,
       image: editedMessage.image || undefined,

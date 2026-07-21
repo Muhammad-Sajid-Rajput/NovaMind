@@ -126,6 +126,8 @@ function ChatMessages() {
         siblingIds.push(newIdStr);
       }
 
+      const currentTime = new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hourCycle: "h12" });
+
       const optimisticNewNode = {
         ...currentUserMsg,
         ...newNode,
@@ -133,6 +135,7 @@ function ChatMessages() {
         _id: newIdStr,
         sender: "user",
         message: newText,
+        time: newNode.time || currentUserMsg.time || currentTime,
         parentMessageId: currentUserMsg.parentMessageId ? String(currentUserMsg.parentMessageId) : null,
         versionInfo: {
           siblingIds,

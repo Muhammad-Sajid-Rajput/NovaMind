@@ -3,7 +3,7 @@
 
 import { useState, useRef, useEffect } from "react";
 
-const EditMessageBox = ({ originalText, onSubmit, onCancel }) => {
+const EditMessageBox = ({ originalText, onSubmit, onCancel, initialWidth }) => {
   const [text, setText] = useState(originalText);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef(null);
@@ -45,18 +45,25 @@ const EditMessageBox = ({ originalText, onSubmit, onCancel }) => {
   const isEmpty = text.trim() === "";
 
   return (
-    <div className="edit-message-box w-full max-w-full">
-      <textarea
-        ref={textareaRef}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={handleKeyDown}
-        className="edit-textarea scrollbar-thin select-text"
-        rows={1}
-        disabled={isSubmitting}
-        aria-label="Edit message input"
-      />
-      <div className="flex justify-end gap-2 mt-2 select-none">
+    <div className="edit-message-box w-full max-w-full flex flex-col gap-2 items-end">
+      <div 
+        className="relative p-3.5 px-4 rounded-[18px_18px_4px_18px] bg-user-bubble text-white shadow-xs flex flex-col gap-1.5 transition-all duration-200 w-fit max-w-full min-w-0 self-end overflow-hidden"
+        style={{
+          minWidth: initialWidth ? `${initialWidth}px` : undefined,
+        }}
+      >
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="w-full bg-transparent text-white text-[14.5px] leading-relaxed font-sans border-none outline-none resize-none p-0 m-0 select-text overflow-hidden wrap-break-word focus:ring-0 focus:outline-none"
+          rows={1}
+          disabled={isSubmitting}
+          aria-label="Edit message input"
+        />
+      </div>
+      <div className="flex justify-end gap-2 mt-1 select-none self-end">
         <button onClick={onCancel} className="edit-cancel-btn" disabled={isSubmitting}>
           Cancel
         </button>
