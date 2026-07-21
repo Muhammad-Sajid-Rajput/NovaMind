@@ -9,7 +9,7 @@ const createLimiter = (windowMs, max, message) =>
     max,
     standardHeaders: true,  // Return rate limit info in RateLimit-* headers
     legacyHeaders:   false,
-    skip:            () => process.env.NODE_ENV === "test", // Bypass rate limits in test environment
+    skip:            () => process.env.NODE_ENV !== "production", // Bypass rate limits in development and test environments
     handler: (req, res) => {
       res.status(429).json({
         error:      message,

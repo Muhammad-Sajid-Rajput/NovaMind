@@ -101,9 +101,25 @@ export const SessionStore = {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
+    // Build canonical ID mapping so _id and custom id references unify
+    const idToCanonicalIdMap = new Map();
+    for (const msg of allMessages) {
+      const canonicalId = String(msg._id);
+      idToCanonicalIdMap.set(canonicalId, canonicalId);
+      if (msg.id) {
+        idToCanonicalIdMap.set(String(msg.id), canonicalId);
+      }
+    }
+
+    const getCanonicalParentId = (parentMsgId) => {
+      if (!parentMsgId) return "ROOT";
+      const str = String(parentMsgId);
+      return idToCanonicalIdMap.get(str) || str;
+    };
+
     const childrenMap = new Map();
     for (const msg of allMessages) {
-      const parentKey = msg.parentMessageId ? String(msg.parentMessageId) : "ROOT";
+      const parentKey = getCanonicalParentId(msg.parentMessageId);
       if (!childrenMap.has(parentKey)) {
         childrenMap.set(parentKey, []);
       }
@@ -114,13 +130,17 @@ export const SessionStore = {
     if (roots.length === 0) return [];
 
     let currentNode = session?.activeRootId
-      ? roots.find((r) => String(r._id) === String(session.activeRootId)) || roots[0]
+      ? roots.find((r) => {
+          const rId = String(r._id);
+          const activeRootStr = String(session.activeRootId);
+          return rId === activeRootStr || (r.id && String(r.id) === activeRootStr);
+        }) || roots[0]
       : roots[0];
 
     const path = [];
 
     while (currentNode) {
-      const parentKey = currentNode.parentMessageId ? String(currentNode.parentMessageId) : "ROOT";
+      const parentKey = getCanonicalParentId(currentNode.parentMessageId);
       const siblings = childrenMap.get(parentKey) || [];
 
       // Only user messages can have edit variants; filter siblings to user-sender only
@@ -145,8 +165,13 @@ export const SessionStore = {
 
       if (!currentNode.activeChildId) break;
 
+      const canonicalActiveChildId = getCanonicalParentId(currentNode.activeChildId);
       const children = childrenMap.get(String(currentNode._id)) || [];
-      const activeChild = children.find((c) => String(c._id) === String(currentNode.activeChildId));
+      const activeChild = children.find((c) => {
+        const cId = String(c._id);
+        const cCustomId = c.id ? String(c.id) : null;
+        return cId === canonicalActiveChildId || cCustomId === canonicalActiveChildId || cId === String(currentNode.activeChildId);
+      });
       if (!activeChild) break;
 
       currentNode = activeChild;
@@ -198,9 +223,20 @@ export const SessionStore = {
         rootId = null;
       } else {
         // Walk up to find the first ancestor with no parentMessageId (= the root).
-        let ancestor = await Message.findById(parentId).lean();
+        const findMsg = async (idVal) => {
+          if (!idVal) return null;
+          const idStr = String(idVal);
+          const isObjId = mongoose.Types.ObjectId.isValid(idStr) &&
+            String(new mongoose.Types.ObjectId(idStr)) === idStr;
+          const query = isObjId
+            ? { _id: idStr, sessionId, userId }
+            : { id: idStr, sessionId, userId };
+          return await Message.findOne(query).lean();
+        };
+
+        let ancestor = await findMsg(parentId);
         while (ancestor && ancestor.parentMessageId) {
-          ancestor = await Message.findById(ancestor.parentMessageId).lean();
+          ancestor = await findMsg(ancestor.parentMessageId);
         }
         rootId = ancestor ? ancestor._id : parentId;
       }
@@ -227,7 +263,15 @@ export const SessionStore = {
       );
       // Refresh the active pointer so the existing sibling is the active branch
       if (parentId) {
-        await Message.findByIdAndUpdate(parentId, { activeChildId: existingSibling._id });
+        const isParentObjId = mongoose.Types.ObjectId.isValid(parentId) &&
+          String(new mongoose.Types.ObjectId(parentId)) === String(parentId);
+        const parentQuery = isParentObjId
+          ? { _id: parentId, sessionId, userId }
+          : { id: parentId, sessionId, userId };
+        const parentDoc = await Message.findOne(parentQuery);
+        if (parentDoc) {
+          await Message.updateOne({ _id: parentDoc._id }, { activeChildId: existingSibling._id });
+        }
       } else {
         await Session.findOneAndUpdate({ _id: sessionId, userId }, { activeRootId: existingSibling._id });
       }
@@ -255,7 +299,15 @@ export const SessionStore = {
     }
 
     if (parentId) {
-      await Message.findByIdAndUpdate(parentId, { activeChildId: newNode._id });
+      const isParentObjectId = mongoose.Types.ObjectId.isValid(parentId) &&
+        String(new mongoose.Types.ObjectId(parentId)) === String(parentId);
+      const parentQuery = isParentObjectId
+        ? { _id: parentId, sessionId, userId }
+        : { id: parentId, sessionId, userId };
+      const parentDoc = await Message.findOne(parentQuery);
+      if (parentDoc) {
+        await Message.updateOne({ _id: parentDoc._id }, { activeChildId: newNode._id });
+      }
     } else {
       await Session.findOneAndUpdate({ _id: sessionId, userId }, { activeRootId: newNode._id });
     }
@@ -345,12 +397,23 @@ export const SessionStore = {
     }
 
     if (parentMessageId) {
-      await Message.findByIdAndUpdate(parentMessageId, { activeChildId: doc._id });
+      const isParentObjectId = mongoose.Types.ObjectId.isValid(parentMessageId) &&
+        String(new mongoose.Types.ObjectId(parentMessageId)) === String(parentMessageId);
+      const parentQuery = isParentObjectId
+        ? { _id: parentMessageId, sessionId, userId }
+        : { id: parentMessageId, sessionId, userId };
+      const parentDoc = await Message.findOne(parentQuery);
+      if (parentDoc) {
+        await Message.updateOne({ _id: parentDoc._id }, { activeChildId: doc._id });
+      }
     } else if (doc.sender === "user") {
       await Session.findOneAndUpdate({ _id: sessionId, userId }, { activeRootId: doc._id });
     }
 
-    // Enforce active path limit — evict oldest root if path exceeds limit
+    // ── Immediate Safety Disable ──────────────────────────────────────────────
+    // Message-limit eviction is disabled to prevent accidental document deletion
+    // during tree branching operations.
+    /*
     const activePath = await SessionStore.getActiveMessagePath(sessionId, userId);
     if (activePath.length > MAX_MESSAGES_PER_SESSION) {
       const oldest = activePath[0];
@@ -359,6 +422,8 @@ export const SessionStore = {
         logger.info(`Message limit reached for session ${sessionId}. Evicted oldest message from path.`);
       }
     }
+    */
+    // ─────────────────────────────────────────────────────────────────────────
     return doc;
   },
 

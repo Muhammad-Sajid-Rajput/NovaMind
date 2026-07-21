@@ -23,6 +23,22 @@ export const useLocalStorage = (key, defaultValue) => {
     }
   }, [key, value]);
 
+  // Listen for storage changes from other browser tabs
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key !== key) return;
+      try {
+        const newValue = e.newValue ? JSON.parse(e.newValue) : defaultValue;
+        setValue(newValue);
+      } catch {
+        // ignore JSON parse error from malformed storage write
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [key, defaultValue]);
+
   return [value, setValue];
 };
 export default useLocalStorage;
