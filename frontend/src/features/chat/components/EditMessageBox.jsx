@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 
 const EditMessageBox = ({ originalText, onSubmit, onCancel }) => {
   const [text, setText] = useState(originalText);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef(null);
 
   // Auto-focus and select all on mount
@@ -24,13 +25,20 @@ const EditMessageBox = ({ originalText, onSubmit, onCancel }) => {
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (text.trim() && text.trim() !== originalText.trim()) {
+      if (!isSubmitting && text.trim() && text.trim() !== originalText.trim()) {
+        setIsSubmitting(true);
         onSubmit(text.trim());
       }
     }
     if (e.key === "Escape") {
       onCancel();
     }
+  };
+
+  const handleSubmitClick = () => {
+    if (isSubmitting || isEmpty || isUnchanged) return;
+    setIsSubmitting(true);
+    onSubmit(text.trim());
   };
 
   const isUnchanged = text.trim() === originalText.trim();
@@ -45,18 +53,19 @@ const EditMessageBox = ({ originalText, onSubmit, onCancel }) => {
         onKeyDown={handleKeyDown}
         className="edit-textarea scrollbar-thin select-text"
         rows={1}
+        disabled={isSubmitting}
         aria-label="Edit message input"
       />
       <div className="flex justify-end gap-2 mt-2 select-none">
-        <button onClick={onCancel} className="edit-cancel-btn">
+        <button onClick={onCancel} className="edit-cancel-btn" disabled={isSubmitting}>
           Cancel
         </button>
         <button
-          onClick={() => onSubmit(text.trim())}
-          disabled={isEmpty || isUnchanged}
+          onClick={handleSubmitClick}
+          disabled={isEmpty || isUnchanged || isSubmitting}
           className="edit-submit-btn"
         >
-          Save & Submit
+          {isSubmitting ? "Submitting…" : "Save & Submit"}
         </button>
       </div>
     </div>
@@ -64,3 +73,4 @@ const EditMessageBox = ({ originalText, onSubmit, onCancel }) => {
 };
 
 export default EditMessageBox;
+

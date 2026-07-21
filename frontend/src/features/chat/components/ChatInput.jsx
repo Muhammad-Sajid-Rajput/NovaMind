@@ -79,6 +79,11 @@ function ChatInput() {
   const prevSessionIdRef       = useRef(null); // guards session-change effect vs HMR
   const hasRestoredRef         = useRef(false); // localStorage restore runs once
   const dragCounterRef         = useRef(0);     // robust drag counter vs flicker
+  // Stable refs so handleAutoSend listener never needs to re-register.
+  // Updated in sync with the live state/function on every render (below).
+  const sendStreamingMessageRef = useRef(null);
+  const isLoadingRef            = useRef(false);
+  const isStreamingRef          = useRef(false);
 
   // Dynamic references for multiple file tracking
   const abortControllersRef    = useRef({}); // { [fileId]: AbortController }
@@ -114,6 +119,12 @@ function ChatInput() {
     setCurrentSessionId,
     isStreamEnabled
   });
+
+  // Keep stable refs in sync so the once-registered handleAutoSend listener
+  // always reads the latest sendStreamingMessage / isLoading / isStreaming.
+  sendStreamingMessageRef.current = sendStreamingMessage;
+  isLoadingRef.current            = isLoading;
+  isStreamingRef.current          = isStreaming;
 
   const handleTranscript = useCallback((transcript) => {
     setInputText((prev) => prev + (prev ? " " : "") + transcript);
@@ -314,6 +325,11 @@ function ChatInput() {
   }, [inputText, currentSessionId, setSessionDrafts]);
 
   // Global custom event listeners
+  // Use refs for sendStreamingMessage / isLoading / isStreaming so this effect
+  // only ever registers ONCE (empty dep array).  Previously, because
+  // sendStreamingMessage is recreated on every render (not memoized in useStream),
+  // the effect would remove + re-add the listener on EVERY render, creating a
+  // window where the listener was momentarily absent.
   useEffect(() => {
     const handleEdit = (e) => {
       setInputText(e.detail.text);
@@ -321,14 +337,16 @@ function ChatInput() {
     };
 
     const handleAutoSend = (e) => {
-      if (isLoading || isStreaming || isSendingRef.current) return;
+      // Read latest values through refs — no stale-closure risk
+      if (isLoadingRef.current || isStreamingRef.current || isSendingRef.current) return;
       isSendingRef.current = true;
-      sendStreamingMessage({
-        message:      e.detail.text,
-        file:         e.detail.file || null,
-        files:        e.detail.files || [],
-        isRagSession: e.detail.isRagSession !== undefined ? e.detail.isRagSession : true,
-        skipAppend:   e.detail.skipAppend,
+      sendStreamingMessageRef.current({
+        message:         e.detail.text,
+        file:            e.detail.file || null,
+        files:           e.detail.files || [],
+        isRagSession:    e.detail.isRagSession !== undefined ? e.detail.isRagSession : true,
+        skipAppend:      e.detail.skipAppend,
+        parentMessageId: e.detail.parentMessageId || null,
       });
     };
 
@@ -346,15 +364,15 @@ function ChatInput() {
       setTimeout(() => setIsGlow(false), 1000);
     };
 
-    window.addEventListener("edit-chat-message",    handleEdit);
-    window.addEventListener("auto-send-chat-message",handleAutoSend);
-    window.addEventListener("insert-chat-template", handleInsertTemplate);
+    window.addEventListener("edit-chat-message",     handleEdit);
+    window.addEventListener("auto-send-chat-message", handleAutoSend);
+    window.addEventListener("insert-chat-template",  handleInsertTemplate);
     return () => {
-      window.removeEventListener("edit-chat-message",    handleEdit);
-      window.removeEventListener("auto-send-chat-message",handleAutoSend);
-      window.removeEventListener("insert-chat-template", handleInsertTemplate);
+      window.removeEventListener("edit-chat-message",     handleEdit);
+      window.removeEventListener("auto-send-chat-message", handleAutoSend);
+      window.removeEventListener("insert-chat-template",  handleInsertTemplate);
     };
-  }, [sendStreamingMessage, isLoading, isStreaming]);
+  }, []); // ← empty: register once, refs keep values fresh
 
   // ── Unified File processing and upload initiation ───────────────────────────
   const addAndUploadFile = async (file) => {
@@ -809,6 +827,9 @@ function ChatInput() {
         : '');
 
     setInputText('');
+    // Immediately flush draft to "" (don't wait for the 150ms debounce) so the
+    // typed message is never restored to the input after the response arrives.
+    setSessionDrafts((prev) => ({ ...prev, [currentSessionId]: '' }));
     clearFileAfterSend();
     isSendingRef.current = true;
 
@@ -950,9 +971,9 @@ function ChatInput() {
           <div className="flex items-center gap-2">
             <div className="hidden lg:block"><ModelSelector compact={false} dropdownPosition="up" /></div>
             <div className="lg:hidden"><ModelSelector compact={true}  dropdownPosition="up" /></div>
-            {charCount > 7000 && (
-              <span className={`text-xs font-semibold ${charCount > 8000 ? "text-error" : "text-warning"}`} role="status">
-                {charCount}/8000
+            {charCount > 27000 && (
+              <span className={`text-xs font-semibold ${charCount > 30000 ? "text-error" : "text-warning"}`} role="status">
+                {charCount}/30000
               </span>
             )}
             {isStreaming ? (

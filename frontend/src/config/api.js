@@ -221,9 +221,10 @@ export const api = {
     clearAll: ()         => del("/sessions"),
   },
   messages: {
-    get:      (sessionId)            => get(`/messages?sessionId=${sessionId}`),
-    clear:    (sessionId)            => del(`/messages?sessionId=${sessionId}`),
-    truncate: (sessionId, fromIndex) => del("/messages/truncate", { sessionId, fromIndex }),
+    get:              (sessionId)                                        => get(`/messages?sessionId=${sessionId}`),
+    clear:            (sessionId)                                        => del(`/messages?sessionId=${sessionId}`),
+    createEditBranch: (sessionId, editedMessageId, newText, file, files) => post("/messages/edit-branch", { sessionId, editedMessageId, newText, file, files }),
+    switchBranch:     (sessionId, parentMessageId, targetChildId)        => post("/messages/switch-branch", { sessionId, parentMessageId, targetChildId }),
   },
   auth: {
     changePassword: (currentPassword, newPassword) =>

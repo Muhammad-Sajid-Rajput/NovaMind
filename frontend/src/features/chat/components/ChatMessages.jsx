@@ -1,5 +1,5 @@
 // NovaMind — ChatMessages.jsx — File Upload Bug Fix
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { Icon } from '@iconify/react';
 import { useChatContext } from '../context/ChatContext.jsx';
 import { useChatScroll } from '../hooks/useChatScroll.js';
@@ -13,6 +13,9 @@ function ChatMessages() {
     currentSessionId,
     setEditingMessageId,
   } = useChatContext();
+
+  // Guard against concurrent edit submissions (e.g. Enter + button click race)
+  const isEditSubmittingRef = useRef(false);
 
   const currentMessages = chatMessages[currentSessionId] || [];
   const hasMessages = currentMessages.length > 0;
@@ -82,108 +85,113 @@ function ChatMessages() {
 
   // ── Edit & resend ──────────────────────────────────
   const handleEditSubmit = useCallback(async (messageId, newText) => {
+    // Prevent concurrent invocations (e.g. Enter + button-click race, fast double-click).
+    // Without this guard, two concurrent calls each call createEditBranch, producing
+    // two sibling branch nodes — one of which never gets a bot reply (empty version).
+    if (isEditSubmittingRef.current) return;
+    isEditSubmittingRef.current = true;
+
     const messages = chatMessages[currentSessionId] || [];
-    const msgIndex = messages.findIndex(m => m.id === messageId);
-    if (msgIndex === -1) return;
-
-    const botResponseIndex = msgIndex + 1;
-    const currentUserMsg = messages[msgIndex];
-    const currentBotResponse = messages[botResponseIndex];
-
-    const currentVersionEntry = {
-      userMessage: currentUserMsg.message,
-      botResponse: currentBotResponse?.sender === 'robot'
-        ? currentBotResponse : null,
-    };
-
-    const updatedVersions = currentUserMsg.versions
-      ? [...currentUserMsg.versions, currentVersionEntry]
-      : [currentVersionEntry];
-
-    const newVersionIndex = updatedVersions.length;
-    const finalVersions = [
-      ...updatedVersions,
-      { userMessage: newText, botResponse: null },
-    ];
-
-    const messagesBefore = messages.slice(0, msgIndex);
-    const updatedUserMsg = {
-      ...currentUserMsg,
-      message: newText,
-      versions: finalVersions,
-      currentVersionIndex: newVersionIndex,
-    };
-
-    setEditingMessageId(null);
-    setChatMessages(prev => ({
-      ...prev,
-      [currentSessionId]: [...messagesBefore, updatedUserMsg],
-    }));
+    const editIndex = messages.findIndex(m => (m.id || m._id) === messageId);
+    if (editIndex === -1) {
+      isEditSubmittingRef.current = false;
+      return;
+    }
+    const currentUserMsg = messages[editIndex];
 
     try {
-      await api.messages.truncate(currentSessionId, msgIndex);
-    } catch (err) {
-      console.error('Failed to truncate backend messages:', err);
-    }
+      const res = await api.messages.createEditBranch(
+        currentSessionId,
+        messageId,
+        newText,
+        currentUserMsg.file || null,
+        currentUserMsg.files || []
+      );
 
-    window.dispatchEvent(new CustomEvent(
-      'auto-send-chat-message',
-      {
-        detail: {
-          text: newText,
-          file: currentUserMsg.file || null,
-          files: currentUserMsg.files || [],
-          isRagSession: !!((currentUserMsg.files || []).some(f => !f.mimeType?.startsWith('image/'))),
-          skipAppend: true
-        }
+      const newNode = res.message;
+      setEditingMessageId(null);
+
+      // Construct optimistic versionInfo and updated user message node
+      const oldVersionInfo = currentUserMsg.versionInfo;
+      const oldIdStr = String(currentUserMsg._id || currentUserMsg.id);
+      const newIdStr = String(newNode._id || newNode.id);
+
+      let siblingIds = oldVersionInfo?.siblingIds
+        ? [...oldVersionInfo.siblingIds]
+        : [oldIdStr];
+
+      if (!siblingIds.includes(newIdStr)) {
+        siblingIds.push(newIdStr);
       }
-    ));
+
+      const optimisticNewNode = {
+        ...currentUserMsg,
+        ...newNode,
+        id: newIdStr,
+        _id: newIdStr,
+        sender: "user",
+        message: newText,
+        parentMessageId: currentUserMsg.parentMessageId ? String(currentUserMsg.parentMessageId) : null,
+        versionInfo: {
+          siblingIds,
+          currentIndex: siblingIds.indexOf(newIdStr) !== -1 ? siblingIds.indexOf(newIdStr) : siblingIds.length - 1
+        }
+      };
+
+      // Keep messages prior to editIndex, place optimisticNewNode at editIndex
+      const messagesBefore = messages.slice(0, editIndex);
+      const optimisticPath = [...messagesBefore, optimisticNewNode];
+
+      // Optimistically update chatMessages state immediately
+      setChatMessages((prev) => ({
+        ...prev,
+        [currentSessionId]: optimisticPath
+      }));
+
+      // Dispatch auto-send with the new branch node's _id as parentMessageId.
+      // useStream will append the loading indicator immediately below optimisticNewNode,
+      // stream the reply, and re-sync authoritative path from server when complete.
+      window.dispatchEvent(new CustomEvent(
+        'auto-send-chat-message',
+        {
+          detail: {
+            text: newText,
+            file: currentUserMsg.file || null,
+            files: currentUserMsg.files || [],
+            isRagSession: !!((currentUserMsg.files || []).some(f => !f.mimeType?.startsWith('image/'))),
+            skipAppend: true,
+            parentMessageId: newNode._id
+          }
+        }
+      ));
+    } catch (err) {
+      console.error('Failed to create edit branch:', err);
+    } finally {
+      isEditSubmittingRef.current = false;
+    }
   }, [currentSessionId, chatMessages, setChatMessages, setEditingMessageId]);
 
   // ── Version navigation ─────────────────────────────
-  const handleVersionNavigate = useCallback((messageId, newIndex) => {
-    setChatMessages(prev => {
-      const messages = prev[currentSessionId] || [];
-      const msgIndex = messages.findIndex(m => m.id === messageId);
-      if (msgIndex === -1) return prev;
+  const handleVersionNavigate = useCallback(async (messageId, targetChildId) => {
+    const messages = chatMessages[currentSessionId] || [];
+    const msg = messages.find(m => (m.id || m._id) === messageId);
+    if (!msg) return;
 
-      const msg = messages[msgIndex];
-      const fromIndex = msg.currentVersionIndex;
-      const targetVersion = msg.versions[newIndex];
-      const currentSubsequent = messages.slice(msgIndex + 2);
-
-      const updatedVersions = msg.versions.map((v, idx) => {
-        if (idx === fromIndex) {
-          const currentBotResponse = messages[msgIndex + 1];
-          return {
-            ...v,
-            botResponse: currentBotResponse?.sender === 'robot'
-              ? currentBotResponse : v.botResponse,
-            subsequentMessages: currentSubsequent,
-          };
-        }
-        return v;
-      });
-
-      const updatedMsg = {
-        ...msg,
-        message: targetVersion.userMessage,
-        versions: updatedVersions,
-        currentVersionIndex: newIndex,
-      };
-
-      return {
-        ...prev,
-        [currentSessionId]: [
-          ...messages.slice(0, msgIndex),
-          updatedMsg,
-          ...(targetVersion.botResponse
-            ? [targetVersion.botResponse] : []),
-          ...(targetVersion.subsequentMessages || []),
-        ],
-      };
-    });
-  }, [currentSessionId, setChatMessages]);
+    try {
+      // Ensure parentMessageId is a plain string — it may be an ObjectId object
+      // if local state was populated before the backend serialization fix landed.
+      const parentMessageId = msg.parentMessageId ? String(msg.parentMessageId) : null;
+      const res = await api.messages.switchBranch(currentSessionId, parentMessageId, targetChildId);
+      if (res && res.messages) {
+        setChatMessages(prev => ({
+          ...prev,
+          [currentSessionId]: res.messages
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to switch branch:', err);
+    }
+  }, [currentSessionId, chatMessages, setChatMessages]);
 
   // ── Render ─────────────────────────────────────────
   return (

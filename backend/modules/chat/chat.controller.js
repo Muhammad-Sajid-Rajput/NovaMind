@@ -261,7 +261,7 @@ const buildContext = async ({
 };
 
 // ─── Shared helper: session creation + history parsing ────────────────────────
-async function prepareMessageContext({ message, sessionId, model, language, contextLimit, incomingHistory, userId }) {
+async function prepareMessageContext({ message, sessionId, model, language, contextLimit, incomingHistory, userId, parentMessageId }) {
   const cleanMessage = sanitizeText(message);
   if (!cleanMessage) {
     const err = new Error("Message content cannot be empty.");
@@ -280,7 +280,10 @@ async function prepareMessageContext({ message, sessionId, model, language, cont
     await SessionStore.createSession(sid, userId, "New Chat");
   }
 
-  if (incomingHistory !== undefined) {
+  // NOTE: setMessages replaces ALL messages in the session (deleteMany + insertMany).
+  // When parentMessageId is present (edit-branch flow), the tree is already correct
+  // in MongoDB — overwriting it with local state would destroy branch structure.
+  if (incomingHistory !== undefined && !parentMessageId) {
     let parsedHistory = [];
     try {
       parsedHistory = typeof incomingHistory === "string" ? JSON.parse(incomingHistory) : incomingHistory;
@@ -298,7 +301,7 @@ async function prepareMessageContext({ message, sessionId, model, language, cont
 }
 
 export const sendMessage = asyncHandler(async (req, res) => {
-  const { message, sessionId, model, language, contextLimit, history: incomingHistory, isRagSession, file, files } = req.body;
+  const { message, sessionId, model, language, contextLimit, history: incomingHistory, isRagSession, file, files, parentMessageId } = req.body;
   const userId = req.user.id;
 
   // ── Limit 1: User can upload only 2 files in one message ────────────────────
@@ -340,7 +343,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
 
   let ctx;
   try {
-    ctx = await prepareMessageContext({ message, sessionId, model, language, contextLimit, incomingHistory, userId });
+    ctx = await prepareMessageContext({ message, sessionId, model, language, contextLimit, incomingHistory, userId, parentMessageId });
   } catch (err) {
     if (err.statusCode === 400) return res.status(400).json({ error: err.message });
     throw err;
@@ -422,18 +425,29 @@ export const sendMessage = asyncHandler(async (req, res) => {
 
   const nonImages = filesArray.filter(f => getDocumentType(f.originalName, f.mimeType) !== 'image');
 
-  await SessionStore.addMessage(sid, userId, {
-    id: crypto.randomUUID(),
-    sender: "user",
-    message: cleanMessage,
-    image: images[0] || undefined,
-    file: nonImages[0] || undefined,
-    files: filesArray,
-    time
-  });
+  // parentMessageId is set when this request originates from an edit-branch
+  // flow. The branch node (user message) already exists in MongoDB — we must
+  // NOT create a duplicate. Instead, treat parentMessageId as the ID of that
+  // existing user message and attach the bot response directly to it.
+  let userMsgId;
+  if (parentMessageId) {
+    userMsgId = parentMessageId;
+  } else {
+    const userMsgDoc = await SessionStore.addMessage(sid, userId, {
+      id: crypto.randomUUID(),
+      sender: "user",
+      message: cleanMessage,
+      image: images[0] || undefined,
+      file: nonImages[0] || undefined,
+      files: filesArray,
+      time
+    });
+    userMsgId = userMsgDoc._id;
+  }
 
-  await SessionStore.addMessage(sid, userId, {
+  const botMsgDoc = await SessionStore.addMessage(sid, userId, {
     id: crypto.randomUUID(),
+    parentMessageId: userMsgId,
     sender: "robot",
     message: reply,
     time,
@@ -462,7 +476,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
 });
 
 export const sendStream = asyncHandler(async (req, res) => {
-  const { message, sessionId, model, language, contextLimit, history: incomingHistory, isRagSession, file, files } = req.body;
+  const { message, sessionId, model, language, contextLimit, history: incomingHistory, isRagSession, file, files, parentMessageId } = req.body;
   const userId = req.user.id;
 
   // ── Limit 1: User can upload only 2 files in one message ────────────────────
@@ -504,7 +518,7 @@ export const sendStream = asyncHandler(async (req, res) => {
 
   let ctx;
   try {
-    ctx = await prepareMessageContext({ message, sessionId, model, language, contextLimit, incomingHistory, userId });
+    ctx = await prepareMessageContext({ message, sessionId, model, language, contextLimit, incomingHistory, userId, parentMessageId });
   } catch (err) {
     if (err.statusCode === 400) return res.status(400).json({ error: err.message });
     throw err;
@@ -583,15 +597,25 @@ export const sendStream = asyncHandler(async (req, res) => {
     const time = getTimeString();
     const nonImages = filesArray.filter(f => getDocumentType(f.originalName, f.mimeType) !== 'image');
 
-    await SessionStore.addMessage(sid, userId, {
-      id: crypto.randomUUID(),
-      sender: "user",
-      message: cleanMessage,
-      image: images[0] || undefined,
-      file: nonImages[0] || undefined,
-      files: filesArray,
-      time
-    });
+    // parentMessageId is set when this request originates from an edit-branch
+    // flow. The branch node (user message) already exists in MongoDB — skip
+    // creating a duplicate. Use parentMessageId as the ID of that existing
+    // user message so the bot response attaches as its child.
+    let userMsgId;
+    if (parentMessageId) {
+      userMsgId = parentMessageId;
+    } else {
+      const userMsgDoc = await SessionStore.addMessage(sid, userId, {
+        id: crypto.randomUUID(),
+        sender: "user",
+        message: cleanMessage,
+        image: images[0] || undefined,
+        file: nonImages[0] || undefined,
+        files: filesArray,
+        time
+      });
+      userMsgId = userMsgDoc._id;
+    }
 
     await handleSSEStream({
       req,
@@ -625,6 +649,7 @@ export const sendStream = asyncHandler(async (req, res) => {
 
           await SessionStore.addMessage(sid, userId, {
             id: crypto.randomUUID(),
+            parentMessageId: userMsgId,
             sender: "robot",
             message: finalBotReply,
             time,
@@ -702,8 +727,9 @@ export const sendVision = asyncHandler(async (req, res) => {
 
   const time = getTimeString();
 
-  await SessionStore.addMessage(sessionId, userId, {
+  const userMsgDoc = await SessionStore.addMessage(sessionId, userId, {
     id: crypto.randomUUID(),
+    parentMessageId: parentMessageId || undefined,
     sender: "user",
     message: cleanMessage,
     image: imageUrl ? { url: imageUrl } : undefined,
@@ -712,6 +738,7 @@ export const sendVision = asyncHandler(async (req, res) => {
 
   await SessionStore.addMessage(sessionId, userId, {
     id: crypto.randomUUID(),
+    parentMessageId: userMsgDoc._id,
     sender: "robot",
     message: reply,
     time,

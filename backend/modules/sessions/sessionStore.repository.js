@@ -83,8 +83,218 @@ export const SessionStore = {
 
   // ─── Messages ──────────────────────────────────────────────────────────────
 
+  getActiveMessagePath: async (sessionId, userId) => {
+    const session = await Session.findOne({ _id: sessionId, userId }).lean();
+    const allMessages = await Message.find({ sessionId, userId }).sort({ createdAt: 1 }).lean();
+    if (allMessages.length === 0) return [];
+
+    // ── Legacy-session fast path ──────────────────────────────────────────────
+    // Sessions created before the tree migration have no parentMessageId /
+    // activeChildId linkage. Detect this and return the flat chronological list
+    // so pre-existing conversations are not broken.
+    const hasTreeStructure =
+      session?.activeRootId != null ||
+      allMessages.some((m) => m.parentMessageId != null || m.activeChildId != null);
+
+    if (!hasTreeStructure) {
+      return allMessages;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const childrenMap = new Map();
+    for (const msg of allMessages) {
+      const parentKey = msg.parentMessageId ? String(msg.parentMessageId) : "ROOT";
+      if (!childrenMap.has(parentKey)) {
+        childrenMap.set(parentKey, []);
+      }
+      childrenMap.get(parentKey).push(msg);
+    }
+
+    const roots = childrenMap.get("ROOT") || [];
+    if (roots.length === 0) return [];
+
+    let currentNode = session?.activeRootId
+      ? roots.find((r) => String(r._id) === String(session.activeRootId)) || roots[0]
+      : roots[0];
+
+    const path = [];
+
+    while (currentNode) {
+      const parentKey = currentNode.parentMessageId ? String(currentNode.parentMessageId) : "ROOT";
+      const siblings = childrenMap.get(parentKey) || [];
+
+      // Only user messages can have edit variants; filter siblings to user-sender only
+      // so bot replies never pollute the sibling list and produce a wrong < 1/2 > count.
+      const userSiblings = siblings.filter((s) => s.sender === "user");
+
+      path.push({
+        ...currentNode,
+        // Serialize parentMessageId to string so the frontend can use it directly
+        parentMessageId: currentNode.parentMessageId ? String(currentNode.parentMessageId) : null,
+        versionInfo:
+          currentNode.sender === "user" && userSiblings.length > 1
+            ? {
+                // Serialize all sibling IDs to strings — avoids ObjectId comparison failures
+                siblingIds: userSiblings.map((s) => String(s._id)),
+                currentIndex: userSiblings.findIndex(
+                  (s) => String(s._id) === String(currentNode._id)
+                )
+              }
+            : null
+      });
+
+      if (!currentNode.activeChildId) break;
+
+      const children = childrenMap.get(String(currentNode._id)) || [];
+      const activeChild = children.find((c) => String(c._id) === String(currentNode.activeChildId));
+      if (!activeChild) break;
+
+      currentNode = activeChild;
+    }
+
+    // ── Sanity guard ──────────────────────────────────────────────────────────
+    // Only fall back to flat list when the tree walk yields NOTHING from a
+    // non-empty collection. The old heuristic (path < half of allMessages)
+    // would misfire as soon as any branch exists, since allMessages includes
+    // all branch nodes — not just the active path.
+    if (path.length === 0 && allMessages.length > 0) {
+      logger.warn(
+        `[getActiveMessagePath] Tree walk for session ${sessionId} returned 0/${allMessages.length} messages — falling back to flat list`
+      );
+      return allMessages;
+    }
+
+    return path;
+  },
+
   getMessages: async (sessionId, userId) => {
-    return Message.find({ sessionId, userId }).sort({ createdAt: 1 }).lean();
+    return SessionStore.getActiveMessagePath(sessionId, userId);
+  },
+
+  createEditBranch: async ({ sessionId, userId, editedMessageId, newText, file, files }) => {
+    // Support both UUID strings (frontend-assigned id field) and MongoDB ObjectIds (_id)
+    let editedMessage = null;
+    const isValidObjectId = mongoose.Types.ObjectId.isValid(editedMessageId) &&
+      String(new mongoose.Types.ObjectId(editedMessageId)) === editedMessageId;
+
+    if (isValidObjectId) {
+      editedMessage = await Message.findOne({ _id: editedMessageId, sessionId, userId });
+    }
+    // Fall back to querying by the UUID id field stored in the document
+    if (!editedMessage) {
+      editedMessage = await Message.findOne({ id: editedMessageId, sessionId, userId });
+    }
+    if (!editedMessage) throw new Error("Message not found");
+
+    const parentId = editedMessage.parentMessageId;
+
+    // Resolve rootId — if the edited message has no rootId (legacy pre-migration
+    // document) and it has a parent, walk up the ancestor chain to find the true
+    // root so the new branch node carries a correct rootId pointer.
+    let rootId = editedMessage.rootId;
+    if (!rootId) {
+      if (!parentId) {
+        // This IS a root-level message; rootId will be set to newNode._id after create.
+        rootId = null;
+      } else {
+        // Walk up to find the first ancestor with no parentMessageId (= the root).
+        let ancestor = await Message.findById(parentId).lean();
+        while (ancestor && ancestor.parentMessageId) {
+          ancestor = await Message.findById(ancestor.parentMessageId).lean();
+        }
+        rootId = ancestor ? ancestor._id : parentId;
+      }
+    }
+
+    // ── Idempotency guard ─────────────────────────────────────────────────────
+    // If an identical sibling (same text, same parent, sender=user) was created
+    // within the last 10 seconds, return it instead of creating a duplicate.
+    // This is a server-side last resort — client-side guards should prevent
+    // double-calls, but this ensures correctness even if they are bypassed.
+    const tenSecondsAgo = new Date(Date.now() - 10_000);
+    const existingSibling = await Message.findOne({
+      sessionId,
+      userId,
+      sender: "user",
+      message: newText,
+      parentMessageId: parentId ?? null,
+      createdAt: { $gte: tenSecondsAgo }
+    }).lean();
+
+    if (existingSibling) {
+      logger.warn(
+        `[createEditBranch] Idempotency hit — returning existing sibling ${existingSibling._id} instead of creating duplicate`
+      );
+      // Refresh the active pointer so the existing sibling is the active branch
+      if (parentId) {
+        await Message.findByIdAndUpdate(parentId, { activeChildId: existingSibling._id });
+      } else {
+        await Session.findOneAndUpdate({ _id: sessionId, userId }, { activeRootId: existingSibling._id });
+      }
+      return existingSibling;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const newNode = await Message.create({
+      sessionId,
+      userId,
+      sender: "user",
+      message: newText,
+      file: file !== undefined ? file : editedMessage.file,
+      files: files !== undefined ? files : editedMessage.files,
+      image: editedMessage.image || undefined,
+      parentMessageId: parentId,
+      rootId: rootId,
+      activeChildId: null,
+      type: "chat"
+    });
+
+    if (!rootId && !parentId) {
+      newNode.rootId = newNode._id;
+      await newNode.save();
+    }
+
+    if (parentId) {
+      await Message.findByIdAndUpdate(parentId, { activeChildId: newNode._id });
+    } else {
+      await Session.findOneAndUpdate({ _id: sessionId, userId }, { activeRootId: newNode._id });
+    }
+
+    return newNode;
+  },
+
+  switchBranch: async ({ sessionId, userId, parentMessageId, targetChildId }) => {
+    if (!sessionId || !targetChildId) {
+      throw new Error("Missing required fields");
+    }
+
+    const isTargetObjectId = mongoose.Types.ObjectId.isValid(targetChildId) &&
+      String(new mongoose.Types.ObjectId(targetChildId)) === targetChildId;
+
+    const childQuery = isTargetObjectId
+      ? { _id: targetChildId, sessionId, userId }
+      : { id: targetChildId, sessionId, userId };
+
+    const child = await Message.findOne(childQuery);
+    if (!child) throw new Error("Branch not found");
+
+    if (parentMessageId) {
+      const isParentObjectId = mongoose.Types.ObjectId.isValid(parentMessageId) &&
+        String(new mongoose.Types.ObjectId(parentMessageId)) === parentMessageId;
+
+      const parentQuery = isParentObjectId
+        ? { _id: parentMessageId, sessionId, userId }
+        : { id: parentMessageId, sessionId, userId };
+
+      const parentDoc = await Message.findOne(parentQuery);
+      if (parentDoc) {
+        await Message.updateOne({ _id: parentDoc._id }, { activeChildId: child._id });
+      }
+    } else {
+      await Session.findOneAndUpdate({ _id: sessionId, userId }, { activeRootId: child._id });
+    }
+
+    return SessionStore.getActiveMessagePath(sessionId, userId);
   },
 
   setMessages: async (sessionId, userId, messages) => {
@@ -96,16 +306,57 @@ export const SessionStore = {
   },
 
   addMessage: async (sessionId, userId, message) => {
-    const doc = new Message({ ...message, sessionId, userId });
+    let parentMessageId = message.parentMessageId;
+    let rootId = message.rootId;
+
+    if (parentMessageId) {
+      const isParentObjectId = mongoose.Types.ObjectId.isValid(parentMessageId) &&
+        String(new mongoose.Types.ObjectId(parentMessageId)) === parentMessageId;
+      if (!isParentObjectId) {
+        const parentDoc = await Message.findOne({ id: parentMessageId, sessionId, userId });
+        if (parentDoc) {
+          parentMessageId = parentDoc._id;
+          rootId = parentDoc.rootId || parentDoc._id;
+        }
+      }
+    }
+
+    if (!parentMessageId) {
+      const activePath = await SessionStore.getActiveMessagePath(sessionId, userId);
+      if (activePath.length > 0) {
+        const lastMsg = activePath[activePath.length - 1];
+        parentMessageId = lastMsg._id;
+        rootId = lastMsg.rootId || lastMsg._id;
+      }
+    }
+
+    const doc = new Message({
+      ...message,
+      parentMessageId: parentMessageId || null,
+      rootId: rootId || null,
+      sessionId,
+      userId
+    });
     await doc.save();
 
-    // Enforce message limit — remove oldest if over limit
-    const count = await Message.countDocuments({ sessionId, userId });
-    if (count > MAX_MESSAGES_PER_SESSION) {
-      const oldest = await Message.findOne({ sessionId, userId }).sort({ createdAt: 1 });
+    if (!doc.rootId && !parentMessageId) {
+      doc.rootId = doc._id;
+      await doc.save();
+    }
+
+    if (parentMessageId) {
+      await Message.findByIdAndUpdate(parentMessageId, { activeChildId: doc._id });
+    } else if (doc.sender === "user") {
+      await Session.findOneAndUpdate({ _id: sessionId, userId }, { activeRootId: doc._id });
+    }
+
+    // Enforce active path limit — evict oldest root if path exceeds limit
+    const activePath = await SessionStore.getActiveMessagePath(sessionId, userId);
+    if (activePath.length > MAX_MESSAGES_PER_SESSION) {
+      const oldest = activePath[0];
       if (oldest) {
-        await oldest.deleteOne();
-        logger.info(`Message limit reached for session ${sessionId}. Evicted oldest message.`);
+        await Message.deleteOne({ _id: oldest._id });
+        logger.info(`Message limit reached for session ${sessionId}. Evicted oldest message from path.`);
       }
     }
     return doc;
@@ -119,26 +370,11 @@ export const SessionStore = {
   getLastNMessages: async (sessionId, userId, n) => {
     const limit = parseInt(n, 10) || 10;
     const historyCount = Math.max(0, limit - 1);
-    const messages = await Message.find({ sessionId, userId })
-      .sort({ createdAt: -1 })
-      .limit(historyCount)
-      .lean();
-    return messages.reverse();
+    const activePath = await SessionStore.getActiveMessagePath(sessionId, userId);
+    return activePath.slice(-historyCount);
   },
 
   getTotalMessagesCount: async () => {
     return Message.countDocuments();
-  },
-
-  truncateMessages: async (sessionId, userId, fromIndex) => {
-    const messages = await Message.find({ sessionId, userId })
-      .sort({ createdAt: 1 })
-      .lean();
-    const toDelete = messages.slice(fromIndex);
-    const ids = toDelete.map((m) => m._id);
-    if (ids.length > 0) {
-      await Message.deleteMany({ _id: { $in: ids } });
-    }
-    return messages.slice(0, fromIndex).length;
   }
 };

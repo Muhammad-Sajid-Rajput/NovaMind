@@ -5,21 +5,35 @@ import React from "react";
 
 const VersionNavigator = ({ 
   message, 
-  onNavigate  // (messageId, newIndex) => void
+  onNavigate  // (messageId, targetChildId) => void
 }) => {
-  const { versions, currentVersionIndex } = message;
+  const { versionInfo } = message;
   
-  if (!versions || versions.length <= 1) return null;
+  if (!versionInfo || !versionInfo.siblingIds || versionInfo.siblingIds.length <= 1) return null;
 
-  const total = versions.length;
-  const current = currentVersionIndex + 1; // 1-based for display
-  const isFirst = currentVersionIndex === 0;
-  const isLast = currentVersionIndex === total - 1;
+  const total = versionInfo.siblingIds.length;
+  const current = versionInfo.currentIndex + 1; // 1-based for display
+  const isFirst = versionInfo.currentIndex === 0;
+  const isLast = versionInfo.currentIndex === total - 1;
+
+  const handlePrev = () => {
+    if (!isFirst) {
+      const prevSiblingId = versionInfo.siblingIds[versionInfo.currentIndex - 1];
+      onNavigate(message.id || message._id, prevSiblingId);
+    }
+  };
+
+  const handleNext = () => {
+    if (!isLast) {
+      const nextSiblingId = versionInfo.siblingIds[versionInfo.currentIndex + 1];
+      onNavigate(message.id || message._id, nextSiblingId);
+    }
+  };
 
   return (
     <div className="version-nav flex items-center gap-1 justify-end mt-1 select-none">
       <button
-        onClick={() => !isFirst && onNavigate(message.id, currentVersionIndex - 1)}
+        onClick={handlePrev}
         disabled={isFirst}
         className={`version-btn ${isFirst ? "opacity-30 cursor-not-allowed" : "hover:text-text-primary cursor-pointer"}`}
         aria-label="Previous version"
@@ -32,7 +46,7 @@ const VersionNavigator = ({
       </span>
       
       <button
-        onClick={() => !isLast && onNavigate(message.id, currentVersionIndex + 1)}
+        onClick={handleNext}
         disabled={isLast}
         className={`version-btn ${isLast ? "opacity-30 cursor-not-allowed" : "hover:text-text-primary cursor-pointer"}`}
         aria-label="Next version"

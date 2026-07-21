@@ -69,12 +69,29 @@ export function useStream({
   }, [editingMessageId, isStreaming]);
 
   // ── Send Message Handler ───────────────────────────
-  const sendMessage = async ({ message: inputText, file = null, files = [], isRagSession = false, skipAppend = false }) => {
+  const sendMessage = async ({ message: inputText, file = null, files = [], isRagSession = false, skipAppend = false, parentMessageId = null }) => {
     const trimmedInput = inputText ? inputText.trim() : "";
     if ((!trimmedInput && !file && (!files || files.length === 0)) || isLoading || countdown > 0) return;
 
     let activeSessionId = sessionId;
     setIsLoading(true);
+
+    // ── Background re-sync helper ─────────────────────────────────────────────
+    // After every AI response, replace local optimistic state with the
+    // authoritative active path from the server so that parentMessageId,
+    // versionInfo, and _id are always correct — never stale from optimistic
+    // renders. Fire-and-forget: never blocks the UI or shows a loading state.
+    const resyncFromServer = (sid) => {
+      api.messages.get(sid).then((data) => {
+        if (data && data.messages) {
+          setChatMessages((prev) => ({
+            ...prev,
+            [sid]: data.messages.map((m) => ({ ...m, id: m.id || String(m._id) }))
+          }));
+        }
+      }).catch(() => { /* non-fatal, ignore */ });
+    };
+    // ──────────────────────────────────────────────────────────────
 
     const getTime = () => {
       return new Date().toLocaleTimeString("en-US", {
@@ -232,7 +249,8 @@ export function useStream({
           history: historyToSend,
           isRagSession: isRagSession,
           file: file,
-          files: files
+          files: files,
+          parentMessageId: parentMessageId || undefined
         });
 
         if (data.model) {
@@ -251,8 +269,7 @@ export function useStream({
 
         setChatMessages((prev) => {
           const currentMsgs = prev[activeSessionId] || [];
-          const loadingIdx = currentMsgs.findIndex((msg) => msg.id === loadingId);
-          let updatedMsgs = currentMsgs.map((msg) =>
+          const updatedMsgs = currentMsgs.map((msg) =>
             msg.id === loadingId
               ? {
                   ...msg,
@@ -262,27 +279,13 @@ export function useStream({
                 }
               : msg
           );
-
-          if (loadingIdx > 0) {
-            const precedingMsg = updatedMsgs[loadingIdx - 1];
-            const completedBotMsg = updatedMsgs[loadingIdx];
-            if (precedingMsg && precedingMsg.sender === "user" && precedingMsg.versions) {
-              const vIdx = precedingMsg.currentVersionIndex;
-              const updatedVersions = precedingMsg.versions.map((v, idx) =>
-                idx === vIdx ? { ...v, botResponse: completedBotMsg } : v
-              );
-              updatedMsgs[loadingIdx - 1] = {
-                ...precedingMsg,
-                versions: updatedVersions
-              };
-            }
-          }
-
           return {
             ...prev,
             [activeSessionId]: updatedMsgs
           };
         });
+        // Re-sync from server so parentMessageId and versionInfo are correct
+        resyncFromServer(activeSessionId);
       } catch (err) {
         const status = err.status || 500;
         let errMsg = "Failed to get a response from the AI. Please try again.";
@@ -386,7 +389,8 @@ export function useStream({
         history: historyToSend,
         isRagSession: isRagSession,
         file: file,
-        files: files
+        files: files,
+        parentMessageId: parentMessageId || undefined
       }, abortControllerRef.current.signal);
 
       const status = response.status;
@@ -481,60 +485,26 @@ export function useStream({
 
       setChatMessages((prev) => {
         const currentMsgs = prev[activeSessionId] || [];
-        const loadingIdx = currentMsgs.findIndex((msg) => msg.id === loadingId);
-        
-        let updatedMsgs = currentMsgs.map((msg) =>
+        const updatedMsgs = currentMsgs.map((msg) =>
           msg.id === loadingId ? { ...msg, isStreaming: false } : msg
         );
-
-        if (loadingIdx > 0) {
-          const precedingMsg = updatedMsgs[loadingIdx - 1];
-          const completedBotMsg = updatedMsgs[loadingIdx];
-          if (precedingMsg && precedingMsg.sender === "user" && precedingMsg.versions) {
-            const vIdx = precedingMsg.currentVersionIndex;
-            const updatedVersions = precedingMsg.versions.map((v, idx) =>
-              idx === vIdx ? { ...v, botResponse: completedBotMsg } : v
-            );
-            updatedMsgs[loadingIdx - 1] = {
-              ...precedingMsg,
-              versions: updatedVersions
-            };
-          }
-        }
-
         return {
           ...prev,
           [activeSessionId]: updatedMsgs
         };
       });
+      // Re-sync from server so parentMessageId and versionInfo are correct
+      resyncFromServer(activeSessionId);
     } catch (err) {
       flushBufferSync();
       if (err.name === "AbortError") {
         setChatMessages((prev) => {
           const currentMsgs = prev[activeSessionId] || [];
-          const loadingIdx = currentMsgs.findIndex((msg) => msg.id === loadingId);
-          
-          let updatedMsgs = currentMsgs.map((msg) =>
+          const updatedMsgs = currentMsgs.map((msg) =>
             msg.id === loadingId
               ? { ...msg, message: streamedText + " (Generation stopped)", isStreaming: false }
               : msg
           );
-
-          if (loadingIdx > 0) {
-            const precedingMsg = updatedMsgs[loadingIdx - 1];
-            const completedBotMsg = updatedMsgs[loadingIdx];
-            if (precedingMsg && precedingMsg.sender === "user" && precedingMsg.versions) {
-              const vIdx = precedingMsg.currentVersionIndex;
-              const updatedVersions = precedingMsg.versions.map((v, idx) =>
-                idx === vIdx ? { ...v, botResponse: completedBotMsg } : v
-              );
-              updatedMsgs[loadingIdx - 1] = {
-                ...precedingMsg,
-                versions: updatedVersions
-              };
-            }
-          }
-
           return {
             ...prev,
             [activeSessionId]: updatedMsgs

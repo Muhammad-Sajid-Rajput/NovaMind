@@ -15,8 +15,8 @@ export const validateChat = [
     .trim()
     .notEmpty()
     .withMessage("Message is required")
-    .isLength({ max: 8000 })
-    .withMessage("Message cannot exceed 8000 characters"),
+    .isLength({ max: 30000 })
+    .withMessage("Message cannot exceed 30000 characters"),
   body("sessionId")
     .optional()
     .trim()

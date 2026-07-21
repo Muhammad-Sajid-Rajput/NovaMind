@@ -11,17 +11,18 @@ const MessageList = memo(({
   return messages.map((msg, index) => {
     if (msg.type === 'system') return null;
 
+    const msgId        = msg.id || msg._id || `msg-${index}`;
     const isLast       = index === messages.length - 1;
     const isLastBotMsg = isLast && msg.sender === 'robot';
 
     return (
       <div
-        key={msg.id}
+        key={msgId}
         className="w-full md:max-w-190 lg:max-w-200
                    xl:max-w-210 mx-auto flex flex-col px-4"
       >
         <ChatMessage
-          id={msg.id}
+          id={msgId}
           message={msg.message}
           sender={msg.sender}
           time={msg.time}
@@ -36,8 +37,8 @@ const MessageList = memo(({
           model={msg.model}
           isError={msg.isError}
           errStatus={msg.errStatus}
-          versions={msg.versions}
-          currentVersionIndex={msg.currentVersionIndex}
+          versionInfo={msg.versionInfo}
+          parentMessageId={msg.parentMessageId}
         />
       </div>
     );
@@ -48,7 +49,7 @@ const MessageList = memo(({
   if (prev.messages.length !== next.messages.length) return false;
 
   const signature = (msg) => [
-    msg?.id,
+    msg?.id || msg?._id,
     msg?.sender,
     msg?.message,
     msg?.isStreaming ? '1' : '0',
@@ -58,6 +59,8 @@ const MessageList = memo(({
     (msg?.files || []).map(f => f.url).join(','),
     msg?.model || '',
     msg?.type || '',
+    msg?.parentMessageId || '',
+    JSON.stringify(msg?.versionInfo || null),
   ].join('|');
 
   for (let i = 0; i < prev.messages.length; i += 1) {

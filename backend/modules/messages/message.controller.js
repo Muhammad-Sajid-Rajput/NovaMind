@@ -28,14 +28,40 @@ export const clearMessages = asyncHandler(async (req, res) => {
   res.json({ success: true, message: "Chat history cleared" });
 });
 
-export const truncateMessages = asyncHandler(async (req, res) => {
-  const { sessionId, fromIndex } = req.body;
+export const createEditBranch = asyncHandler(async (req, res) => {
+  const { sessionId, editedMessageId, newText, file, files } = req.body;
   const userId = req.user.id;
 
-  if (!sessionId || fromIndex === undefined) {
+  if (!sessionId || !editedMessageId || !newText) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
-  const remaining = await SessionStore.truncateMessages(sessionId, userId, fromIndex);
-  res.json({ success: true, remainingMessages: remaining });
+  const newNode = await SessionStore.createEditBranch({
+    sessionId,
+    userId,
+    editedMessageId,
+    newText,
+    file,
+    files
+  });
+
+  res.json({ success: true, message: newNode });
+});
+
+export const switchBranch = asyncHandler(async (req, res) => {
+  const { sessionId, parentMessageId, targetChildId } = req.body;
+  const userId = req.user.id;
+
+  if (!sessionId || !targetChildId) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  const messages = await SessionStore.switchBranch({
+    sessionId,
+    userId,
+    parentMessageId: parentMessageId || null,
+    targetChildId
+  });
+
+  res.json({ success: true, messages });
 });

@@ -51,8 +51,8 @@ function ChatMessage({
   model,
   isError,
   errStatus,
-  versions,
-  currentVersionIndex,
+  versionInfo,
+  parentMessageId,
   files
 }) {
   const { searchQuery, editingMessageId, setEditingMessageId } = useChatContext();
@@ -273,7 +273,7 @@ function ChatMessage({
           {!isEditing && (
             <>
               <VersionNavigator
-                message={{ id, versions, currentVersionIndex }}
+                message={{ id, _id: id, versionInfo, parentMessageId }}
                 onNavigate={onNavigate}
               />
               <MessageActions
@@ -374,7 +374,7 @@ export default memo(ChatMessage, (prevProps, nextProps) => {
     prevProps.model === nextProps.model &&
     prevProps.isError === nextProps.isError &&
     prevProps.errStatus === nextProps.errStatus &&
-    prevProps.currentVersionIndex === nextProps.currentVersionIndex &&
-    prevProps.versions === nextProps.versions
+    prevProps.parentMessageId === nextProps.parentMessageId &&
+    JSON.stringify(prevProps.versionInfo) === JSON.stringify(nextProps.versionInfo)
   );
 });

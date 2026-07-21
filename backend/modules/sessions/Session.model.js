@@ -18,6 +18,10 @@ const sessionSchema = new mongoose.Schema(
       type: String,
       default: "New Chat",
       maxlength: 50
+    },
+    activeRootId: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null
     }
   },
   { timestamps: true }

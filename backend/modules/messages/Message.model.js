@@ -24,6 +24,12 @@ const messageSchema = new mongoose.Schema(
       type: String,
       required: true
     },
+    id: {
+      type: String,
+      default: null,
+      index: true,
+      sparse: true
+    },
     time: {
       type: String
     },
@@ -65,6 +71,20 @@ const messageSchema = new mongoose.Schema(
     isError: {
       type: Boolean,
       default: false
+    },
+    parentMessageId: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+      index: true
+    },
+    activeChildId: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null
+    },
+    rootId: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+      index: true
     }
   },
   { timestamps: true }
@@ -72,6 +92,8 @@ const messageSchema = new mongoose.Schema(
 
 messageSchema.index({ sessionId: 1, createdAt: 1 });
 messageSchema.index({ sessionId: 1, userId: 1, createdAt: 1 });
+messageSchema.index({ sessionId: 1, parentMessageId: 1 });
+messageSchema.index({ parentMessageId: 1, createdAt: 1 });
 // Full-text search (Phase 5.6)
 messageSchema.index({ message: "text" });
 

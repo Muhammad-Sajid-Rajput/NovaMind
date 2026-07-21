@@ -47,19 +47,10 @@ export function useSessions(setChatMessages, chatMessages) {
             if (data.messages.length === 0 && localMsgs.length > 0) {
               return prev;
             }
-            const localById = new Map(localMsgs.map((msg) => [msg.id, msg]));
-            const normalized = data.messages.map((m) => {
-              const id = m.id || m._id;
-              const local = localById.get(id);
-              return {
-                ...local,
-                ...m,
-                id,
-                image: m.image ?? local?.image ?? null,
-                file: m.file ?? local?.file ?? null,
-                files: m.files ?? local?.files ?? [],
-              };
-            });
+            const normalized = data.messages.map((m) => ({
+              ...m,
+              id: m.id || m._id
+            }));
             return {
               ...prev,
               [currentSessionId]: normalized
