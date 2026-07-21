@@ -12,6 +12,7 @@ function ChatMessages() {
     setChatMessages,
     currentSessionId,
     setEditingMessageId,
+    setIsSwitchingBranch,
   } = useChatContext();
 
   // Guard against concurrent edit submissions (e.g. Enter + button click race)
@@ -74,6 +75,7 @@ function ChatMessages() {
               files: lastUserMsg.files || [],
               isRagSession: !!((lastUserMsg.files || []).some(f => !f.mimeType?.startsWith('image/'))),
               skipAppend: true,
+              parentMessageId: lastUserMsg._id || lastUserMsg.id,
             }
           }
         ));
@@ -177,6 +179,8 @@ function ChatMessages() {
     const msg = messages.find(m => (m.id || m._id) === messageId);
     if (!msg) return;
 
+    if (setIsSwitchingBranch) setIsSwitchingBranch(true);
+
     try {
       // Ensure parentMessageId is a plain string — it may be an ObjectId object
       // if local state was populated before the backend serialization fix landed.
@@ -190,8 +194,10 @@ function ChatMessages() {
       }
     } catch (err) {
       console.error('Failed to switch branch:', err);
+    } finally {
+      if (setIsSwitchingBranch) setIsSwitchingBranch(false);
     }
-  }, [currentSessionId, chatMessages, setChatMessages]);
+  }, [currentSessionId, chatMessages, setChatMessages, setIsSwitchingBranch]);
 
   // ── Render ─────────────────────────────────────────
   return (

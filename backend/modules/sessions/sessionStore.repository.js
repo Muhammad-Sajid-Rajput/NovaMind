@@ -373,6 +373,10 @@ export const SessionStore = {
       }
     }
 
+    // ── Fallback Safety Net ───────────────────────────────────────────────────
+    // Primary chat flow explicitly passes parentMessageId derived from frontend state
+    // to prevent client/server DB write races. This fallback is maintained for
+    // backward compatibility and callers that do not supply parentMessageId.
     if (!parentMessageId) {
       const activePath = await SessionStore.getActiveMessagePath(sessionId, userId);
       if (activePath.length > 0) {

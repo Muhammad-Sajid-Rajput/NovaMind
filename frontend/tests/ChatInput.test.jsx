@@ -116,13 +116,13 @@ describe("🎨 ChatInput Component Tests", () => {
 
     const textarea = screen.getByPlaceholderText(/Message NovaMind/i);
     
-    // Generate a string of 7500 characters
-    const longText = "a".repeat(7500);
+    // Generate a string of 27500 characters (limit is 30000)
+    const longText = "a".repeat(27500);
     fireEvent.change(textarea, { target: { value: longText } });
 
-    // Counter should appear (e.g. 7500/8000)
+    // Counter should appear (e.g. 27500/30000)
     const counter = screen.getByRole("status");
     expect(counter).toBeInTheDocument();
-    expect(counter.textContent).toBe("7500/8000");
+    expect(counter.textContent).toBe("27500/30000");
   });
 });

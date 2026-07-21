@@ -1,12 +1,13 @@
 // NovaMind — frontend/src/hooks/useMessages.js
 
+import { useCallback } from "react";
 import { useLocalStorage } from "../../../core/hooks/useLocalStorage.js";
 import { STORAGE_KEYS } from "../../../core/constants/index.js";
 
 export function useMessages() {
   const [chatMessages, setRawChatMessages] = useLocalStorage(STORAGE_KEYS.MESSAGES, {});
 
-  const setChatMessages = (updater) => {
+  const setChatMessages = useCallback((updater) => {
     setRawChatMessages((prevReactState) => {
       const nextProposed = typeof updater === "function" ? updater(prevReactState) : updater;
 
@@ -56,11 +57,11 @@ export function useMessages() {
 
       return merged;
     });
-  };
+  }, [setRawChatMessages]);
 
-  const clearCurrentChat = () => {
+  const clearCurrentChat = useCallback(() => {
     setChatMessages({});
-  };
+  }, [setChatMessages]);
 
   return {
     chatMessages,

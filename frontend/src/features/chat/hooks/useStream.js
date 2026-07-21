@@ -137,6 +137,18 @@ export function useStream({
       }
     }
 
+    // Filter out any transient loading / streaming placeholders
+    const validCurrentMsgs = currentMsgs.filter(
+      (m) => m.message !== "__LOADING__" && !m.isStreaming
+    );
+
+    // Derive explicit parentMessageId if not explicitly passed (e.g. normal user send)
+    let explicitParentMessageId = parentMessageId;
+    if (!explicitParentMessageId && validCurrentMsgs.length > 0) {
+      const lastMsg = validCurrentMsgs[validCurrentMsgs.length - 1];
+      explicitParentMessageId = lastMsg._id || lastMsg.id || null;
+    }
+
     // ⚡ INSTANT OPTIMISTIC RENDERING (0ms) ⚡
     setChatMessages((prev) => {
       const msgs = prev[activeSessionId] || [];
@@ -250,7 +262,8 @@ export function useStream({
           isRagSession: isRagSession,
           file: file,
           files: files,
-          parentMessageId: parentMessageId || undefined
+          parentMessageId: explicitParentMessageId || undefined,
+          skipAppend: !!skipAppend
         });
 
         if (data.model) {
@@ -390,7 +403,8 @@ export function useStream({
         isRagSession: isRagSession,
         file: file,
         files: files,
-        parentMessageId: parentMessageId || undefined
+        parentMessageId: explicitParentMessageId || undefined,
+        skipAppend: !!skipAppend
       }, abortControllerRef.current.signal);
 
       const status = response.status;

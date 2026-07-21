@@ -301,7 +301,7 @@ async function prepareMessageContext({ message, sessionId, model, language, cont
 }
 
 export const sendMessage = asyncHandler(async (req, res) => {
-  const { message, sessionId, model, language, contextLimit, history: incomingHistory, isRagSession, file, files, parentMessageId } = req.body;
+  const { message, sessionId, model, language, contextLimit, history: incomingHistory, isRagSession, file, files, parentMessageId, skipAppend } = req.body;
   const userId = req.user.id;
 
   // ── Limit 1: User can upload only 2 files in one message ────────────────────
@@ -425,16 +425,17 @@ export const sendMessage = asyncHandler(async (req, res) => {
 
   const nonImages = filesArray.filter(f => getDocumentType(f.originalName, f.mimeType) !== 'image');
 
-  // parentMessageId is set when this request originates from an edit-branch
-  // flow. The branch node (user message) already exists in MongoDB — we must
-  // NOT create a duplicate. Instead, treat parentMessageId as the ID of that
-  // existing user message and attach the bot response directly to it.
+  // skipAppend is true when this request originates from an edit-branch
+  // flow. The branch node (user message) already exists in MongoDB — skip
+  // creating a duplicate. Use parentMessageId as the ID of that existing
+  // user message so the bot response attaches as its child.
   let userMsgId;
-  if (parentMessageId) {
+  if (skipAppend) {
     userMsgId = parentMessageId;
   } else {
     const userMsgDoc = await SessionStore.addMessage(sid, userId, {
       id: crypto.randomUUID(),
+      parentMessageId: parentMessageId || undefined,
       sender: "user",
       message: cleanMessage,
       image: images[0] || undefined,
@@ -476,7 +477,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
 });
 
 export const sendStream = asyncHandler(async (req, res) => {
-  const { message, sessionId, model, language, contextLimit, history: incomingHistory, isRagSession, file, files, parentMessageId } = req.body;
+  const { message, sessionId, model, language, contextLimit, history: incomingHistory, isRagSession, file, files, parentMessageId, skipAppend } = req.body;
   const userId = req.user.id;
 
   // ── Limit 1: User can upload only 2 files in one message ────────────────────
@@ -597,16 +598,17 @@ export const sendStream = asyncHandler(async (req, res) => {
     const time = getTimeString();
     const nonImages = filesArray.filter(f => getDocumentType(f.originalName, f.mimeType) !== 'image');
 
-    // parentMessageId is set when this request originates from an edit-branch
+    // skipAppend is true when this request originates from an edit-branch
     // flow. The branch node (user message) already exists in MongoDB — skip
     // creating a duplicate. Use parentMessageId as the ID of that existing
     // user message so the bot response attaches as its child.
     let userMsgId;
-    if (parentMessageId) {
+    if (skipAppend) {
       userMsgId = parentMessageId;
     } else {
       const userMsgDoc = await SessionStore.addMessage(sid, userId, {
         id: crypto.randomUUID(),
+        parentMessageId: parentMessageId || undefined,
         sender: "user",
         message: cleanMessage,
         image: images[0] || undefined,

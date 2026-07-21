@@ -58,7 +58,8 @@ function ChatInput() {
     editingMessageId,
     sessionDrafts,
     setSessionDrafts,
-    isStreamEnabled
+    isStreamEnabled,
+    isSwitchingBranch
   } = useChatContext();
 
   // ── UI state ────────────────────────────────────────────────────────────────
@@ -84,6 +85,7 @@ function ChatInput() {
   const sendStreamingMessageRef = useRef(null);
   const isLoadingRef            = useRef(false);
   const isStreamingRef          = useRef(false);
+  const isSwitchingBranchRef    = useRef(false);
 
   // Dynamic references for multiple file tracking
   const abortControllersRef    = useRef({}); // { [fileId]: AbortController }
@@ -121,10 +123,11 @@ function ChatInput() {
   });
 
   // Keep stable refs in sync so the once-registered handleAutoSend listener
-  // always reads the latest sendStreamingMessage / isLoading / isStreaming.
+  // always reads the latest sendStreamingMessage / isLoading / isStreaming / isSwitchingBranch.
   sendStreamingMessageRef.current = sendStreamingMessage;
   isLoadingRef.current            = isLoading;
   isStreamingRef.current          = isStreaming;
+  isSwitchingBranchRef.current    = !!isSwitchingBranch;
 
   const handleTranscript = useCallback((transcript) => {
     setInputText((prev) => prev + (prev ? " " : "") + transcript);
@@ -338,7 +341,8 @@ function ChatInput() {
 
     const handleAutoSend = (e) => {
       // Read latest values through refs — no stale-closure risk
-      if (isLoadingRef.current || isStreamingRef.current || isSendingRef.current) return;
+      const hasExplicitParent = !!(e.detail?.parentMessageId || e.detail?.skipAppend);
+      if (isLoadingRef.current || isStreamingRef.current || isSendingRef.current || (!hasExplicitParent && isSwitchingBranchRef.current)) return;
       isSendingRef.current = true;
       sendStreamingMessageRef.current({
         message:         e.detail.text,
@@ -874,7 +878,8 @@ function ChatInput() {
     (inputText.trim().length > 0 || attachedFiles.some(f => f.uploadState === 'done')) &&
     !isStreaming &&
     !isAnyFileProcessing &&
-    !isCleaningUp;
+    !isCleaningUp &&
+    !isSwitchingBranch;
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -929,7 +934,7 @@ function ChatInput() {
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
             else if (e.key === "Escape")          { setInputText(""); }
           }}
-          disabled={(isLoading && !isStreaming) || editingMessageId !== null}
+          disabled={(isLoading && !isStreaming) || editingMessageId !== null || isSwitchingBranch}
           rows={1}
           style={{ padding: attachedFiles.length > 0 ? '8px 12px 10px' : '12px 12px' }}
           aria-label="Chat Message Input"
@@ -950,7 +955,7 @@ function ChatInput() {
             <button
               className="w-9 h-9 flex items-center justify-center bg-transparent border-none text-text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer rounded-lg text-xl"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isLoading || editingMessageId !== null || attachedFiles.length >= 2 || isCleaningUp}
+              disabled={isLoading || editingMessageId !== null || attachedFiles.length >= 2 || isCleaningUp || isSwitchingBranch}
               title={isCleaningUp ? "Cleaning up previous session..." : attachedFiles.length >= 2 ? "Maximum 2 files uploaded" : "Upload Attachment (Images, Documents)"}
             >
               <Icon icon="material-symbols:attach-file" />
@@ -959,7 +964,7 @@ function ChatInput() {
               <button
                 className={`w-9 h-9 flex items-center justify-center bg-transparent border-none text-text-secondary hover:text-primary hover:bg-surface-hover cursor-pointer rounded-lg text-xl ${isRecording ? "text-error animate-pulse" : ""} ${editingMessageId !== null ? "opacity-50 cursor-not-allowed" : ""}`}
                 onClick={toggleRecording}
-                disabled={editingMessageId !== null}
+                disabled={editingMessageId !== null || isSwitchingBranch}
                 title={isRecording ? "Stop voice input" : "Voice dictation"}
               >
                 <Icon icon={isRecording ? "material-symbols:mic-outline" : "material-symbols:mic-off-outline"} />
@@ -989,7 +994,7 @@ function ChatInput() {
                 className={`w-9 h-9 flex items-center justify-center border-none rounded-full cursor-pointer text-lg active:scale-95 shadow-xs ${canSend ? "bg-primary text-white hover:bg-primary-hover" : "bg-surface-hover text-text-muted cursor-not-allowed"}`}
                 onClick={handleSend}
                 disabled={!canSend}
-                title="Send message"
+                title={isSwitchingBranch ? "Switching branch..." : "Send message"}
               >
                 <Icon icon="material-symbols:arrow-upward" />
               </button>

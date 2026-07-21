@@ -20,6 +20,7 @@ export const ChatProvider = ({ children }) => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingMessageId, setEditingMessageId] = useState(null);
+  const [isSwitchingBranch, setIsSwitchingBranch] = useState(false);
 
   // central app configuration states
   const [contextLimit, setContextLimit] = useState(
@@ -107,6 +108,8 @@ export const ChatProvider = ({ children }) => {
     setSearchQuery,
     editingMessageId,
     setEditingMessageId,
+    isSwitchingBranch,
+    setIsSwitchingBranch,
     contextLimit,
     setContextLimit,
     selectedLanguage,
