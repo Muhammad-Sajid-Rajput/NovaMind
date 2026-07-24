@@ -1,11 +1,12 @@
-// NovaMind — auth.controller.js — Error System
+// NovaMind — auth.controller.js
 // Dual-token auth: accessToken (15min) in response body, refreshToken (30d) in httpOnly cookie.
 
-import jwt from "jsonwebtoken";
+import jwt  from "jsonwebtoken";
 import User from "./User.model.js";
-import { asyncHandler } from "../../core/utils/asyncHandler.js";
+import { asyncHandler }                  from "../../core/utils/asyncHandler.js";
 import { sendVerificationEmail, sendPasswordResetEmail } from "../../core/services/emailService.js";
-import { logger } from "../../core/utils/logger.js";
+import { logger }                        from "../../core/utils/logger.js";
+import { setRefreshCookie, clearRefreshCookie } from "./cookieHelper.js";
 
 // ─── Token Helpers ────────────────────────────────────────────────────────────
 
@@ -18,26 +19,6 @@ const generateRefreshToken = (userId) =>
   jwt.sign({ userId: userId.toString() }, process.env.JWT_REFRESH_SECRET, {
     expiresIn: "30d",
   });
-
-// Cookie is scoped to /api/auth/refresh so it is ONLY sent to that one endpoint.
-const setRefreshCookie = (res, token) => {
-  res.cookie("refreshToken", token, {
-    httpOnly: true,
-    secure:   process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-    maxAge:   30 * 24 * 60 * 60 * 1000, // 30 days in ms
-    path:     "/",       // root path to allow cross-origin path consistency
-  });
-};
-
-const clearRefreshCookie = (res) => {
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure:   process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-    path:     "/",
-  });
-};
 
 // ─── POST /api/auth/register ──────────────────────────────────────────────────
 export const register = asyncHandler(async (req, res) => {
@@ -125,8 +106,8 @@ export const verifyEmail = asyncHandler(async (req, res) => {
   await user.save();
 
   res.status(200).json({
-    success:     true,
-    message:     "Email verified successfully. Please log in to your account.",
+    success: true,
+    message: "Email verified successfully. Please log in to your account.",
   });
 });
 
@@ -197,6 +178,8 @@ export const login = asyncHandler(async (req, res) => {
 });
 
 // ─── POST /api/auth/refresh ───────────────────────────────────────────────────
+// Fix #8: Issue a new refresh token on every refresh (token rotation).
+// This limits the window of a stolen token to the time since last refresh.
 export const refreshToken = asyncHandler(async (req, res) => {
   const token = req.cookies?.refreshToken;
 
@@ -221,7 +204,10 @@ export const refreshToken = asyncHandler(async (req, res) => {
     return res.status(401).json({ error: "Invalid session. Please log in again." });
   }
 
-  const newAccessToken = generateAccessToken(user._id);
+  // Rotate: issue fresh access token AND fresh refresh token
+  const newAccessToken  = generateAccessToken(user._id);
+  const newRefreshToken = generateRefreshToken(user._id);
+  setRefreshCookie(res, newRefreshToken);
 
   res.status(200).json({
     success:     true,
@@ -240,7 +226,7 @@ export const logout = asyncHandler(async (req, res) => {
 export const getMe = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id);
   if (!user) {
-    return res.status(404).json({ error: "No account found with this email. Please register first." });
+    return res.status(404).json({ error: "User not found." });
   }
   res.status(200).json({ success: true, user: user.toJSON() });
 });

@@ -13,8 +13,8 @@ export const generatePassword = asyncHandler(async (req, res) => {
 });
 
 export const getStatus = asyncHandler(async (req, res) => {
-  const activeSessionsCount = SessionStore.getSessionCount();
-  const totalMessagesCount = SessionStore.getTotalMessagesCount();
+  const activeSessionsCount = await SessionStore.getSessionCount();
+  const totalMessagesCount  = await SessionStore.getTotalMessagesCount();
 
   res.json({
     status: "healthy",

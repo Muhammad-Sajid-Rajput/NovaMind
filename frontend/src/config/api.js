@@ -37,6 +37,7 @@ const fetchWithRefresh = async (url, options = {}) => {
       ...options,
       credentials: "include", // sends httpOnly refreshToken cookie
       headers: {
+        "X-Requested-With": "XMLHttpRequest",
         ...options.headers,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
@@ -227,6 +228,22 @@ export const api = {
     switchBranch:     (sessionId, parentMessageId, targetChildId)        => post("/messages/switch-branch", { sessionId, parentMessageId, targetChildId }),
   },
   auth: {
+    login: (email, password) =>
+      post("/auth/login", { email, password }),
+    register: (email, password, name) =>
+      post("/auth/register", { email, password, name }),
+    verifyEmail: (email, code) =>
+      post("/auth/verify-email", { email, code }),
+    resendOtp: (email) =>
+      post("/auth/resend-otp", { email }),
+    forgotPassword: (email) =>
+      post("/auth/forgot-password", { email }),
+    verifyResetCode: (email, code) =>
+      post("/auth/verify-reset-code", { email, code }),
+    resetPassword: (email, code, newPassword) =>
+      post("/auth/reset-password", { email, code, newPassword }),
+    logout: () =>
+      post("/auth/logout"),
     changePassword: (currentPassword, newPassword) =>
       patch("/auth/change-password", { currentPassword, newPassword }),
     deleteAccount:  (password) =>

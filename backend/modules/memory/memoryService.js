@@ -105,53 +105,11 @@ const EXPLICIT_SAVE_PATTERNS = [
 ];
 
 // Exported so chat.controller.js can route before calling either save path
-export const isExplicitSaveRequest = async (message) => {
+export const isExplicitSaveRequest = (message) => {
   if (typeof message !== 'string') return false;
-
-  // Stage 1: Regex Fast-path
-  const regexMatched = EXPLICIT_SAVE_PATTERNS.some((p) => p.test(message));
-  if (regexMatched) {
-    logger.info('[Memory] isExplicitSaveRequest matched via Regex fast-path', { messagePreview: message.slice(0, 80) });
-    return true;
-  }
-
-  // Stage 2: LLM Classifier Fallback
-  try {
-    const { model, reportSuccess, reportFailure } = getModelWithKey(MEMORY_MODEL);
-    const prompt = `
-    Analyze the user message below. Does this message explicitly ask the AI to remember, save, keep in mind, or store a fact for future reference?
-    Reply with either "YES" or "NO" only. Do not add punctuation, explanation, or extra words.
-
-    User message: "${message}"
-    `.trim();
-
-    let result;
-    try {
-      result = await model.generateContent(prompt);
-      reportSuccess();
-    } catch (err) {
-      reportFailure(err);
-      throw err;
-    }
-
-    const responseText = result.response.text().trim().toUpperCase();
-    const llmMatched = responseText.includes("YES");
-
-    logger.info('[Memory] isExplicitSaveRequest matched via LLM fallback', {
-      llmMatched,
-      rawResponse: responseText,
-      messagePreview: message.slice(0, 80)
-    });
-
-    return llmMatched;
-  } catch (err) {
-    logger.error('[Memory] isExplicitSaveRequest LLM fallback failed', {
-      error: err.message,
-      stack: err.stack
-    });
-    return false; // Fall back to false on error to avoid blocking critical path
-  }
+  return EXPLICIT_SAVE_PATTERNS.some((p) => p.test(message));
 };
+
 
 // Strip the trigger phrase from raw text (used as LLM fallback)
 const stripTriggerPhrase = (message) =>

@@ -1,4 +1,4 @@
-// NovaMind — FilePreview.jsx — File Upload Bug Fix
+// NovaMind — FilePreview.jsx — Sleek UI Color Fix & Design Polish
 import { Icon } from '@iconify/react';
 
 const FILE_ICONS = {
@@ -9,7 +9,7 @@ const FILE_ICONS = {
   xls:  { icon: 'vscode-icons:file-type-excel',      color: '#059669' },
   pptx: { icon: 'vscode-icons:file-type-powerpoint', color: '#ea580c' },
   ppt:  { icon: 'vscode-icons:file-type-powerpoint', color: '#ea580c' },
-  txt:  { icon: 'vscode-icons:file-type-text',       color: '#7c3aed' },
+  txt:  { icon: 'vscode-icons:file-type-text',       color: '#a855f7' },
   csv:  { icon: 'vscode-icons:file-type-csv',        color: '#059669' },
 };
 
@@ -17,7 +17,7 @@ const getFileIcon = (filename) => {
   const ext = filename?.split('.').pop().toLowerCase();
   return FILE_ICONS[ext] || { 
     icon:  'material-symbols:description-outline', 
-    color: '#7c3aed' 
+    color: '#8b5cf6' 
   };
 };
 
@@ -28,10 +28,10 @@ const formatBytes = (bytes) => {
   return `${(bytes/1024/1024).toFixed(1)} MB`;
 };
 
-const ProgressRing = ({ progress, size = 22, strokeWidth = 2 }) => {
+const ProgressRing = ({ progress = 0, size = 22, strokeWidth = 2, strokeColor = '#a855f7' }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference * (1 - progress / 100);
+  const strokeDashoffset = circumference * (1 - Math.min(100, Math.max(0, progress)) / 100);
 
   return (
     <svg
@@ -41,7 +41,7 @@ const ProgressRing = ({ progress, size = 22, strokeWidth = 2 }) => {
       style={{
         transform: 'rotate(-90deg)',
         transformOrigin: '50% 50%',
-        animation: 'progress-spin 1.5s linear infinite',
+        animation: progress === 0 ? 'progress-spin 1.5s linear infinite' : 'none',
       }}
     >
       {/* Background circle track */}
@@ -49,7 +49,7 @@ const ProgressRing = ({ progress, size = 22, strokeWidth = 2 }) => {
         cx={size / 2}
         cy={size / 2}
         r={radius}
-        stroke="rgba(255, 255, 255, 0.2)"
+        stroke="rgba(255, 255, 255, 0.15)"
         strokeWidth={strokeWidth}
         fill="transparent"
       />
@@ -58,7 +58,7 @@ const ProgressRing = ({ progress, size = 22, strokeWidth = 2 }) => {
         cx={size / 2}
         cy={size / 2}
         r={radius}
-        stroke="white"
+        stroke={strokeColor}
         strokeWidth={strokeWidth}
         fill="transparent"
         strokeDasharray={circumference}
@@ -74,19 +74,23 @@ const ProgressRing = ({ progress, size = 22, strokeWidth = 2 }) => {
 
 const XButton = ({ onClick, disabled }) => (
   <button
-    onClick={onClick}
+    onClick={(e) => {
+      e.stopPropagation();
+      if (!disabled && onClick) onClick(e);
+    }}
     disabled={disabled}
     aria-label="Remove file"
     style={{
       position:       'absolute',
       top:            '50%',
-        right:          '8px',
+      right:          '10px',
       transform:      'translateY(-50%)',
-        width:          '12px',
-        height:         '12px',
+      width:          '20px',
+      height:         '20px',
       borderRadius:   '50%',
-      background:     disabled ? '#32324a' : '#32324a',
-      border:         '1px solid #111118',
+      background:     'rgba(255, 255, 255, 0.06)',
+      border:         '1px solid rgba(255, 255, 255, 0.12)',
+      color:          'rgba(255, 255, 255, 0.6)',
       display:        'flex',
       alignItems:     'center',
       justifyContent: 'center',
@@ -98,18 +102,20 @@ const XButton = ({ onClick, disabled }) => (
     }}
     onMouseEnter={(e) => {
       if (!disabled) {
-        e.currentTarget.style.background    = '#f87171';
-        e.currentTarget.style.borderColor   = '#f87171';
+        e.currentTarget.style.background  = 'rgba(239, 68, 68, 0.2)';
+        e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+        e.currentTarget.style.color       = '#ef4444';
       }
     }}
     onMouseLeave={(e) => {
-      e.currentTarget.style.background    = '#32324a';
-      e.currentTarget.style.borderColor   = '#111118';
+      e.currentTarget.style.background  = 'rgba(255, 255, 255, 0.06)';
+      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+      e.currentTarget.style.color       = 'rgba(255, 255, 255, 0.6)';
     }}
   >
     <Icon
       icon="material-symbols:close-rounded"
-      style={{ fontSize: '8px', color: 'white' }}
+      style={{ fontSize: '12px', color: 'inherit' }}
     />
   </button>
 );
@@ -117,7 +123,7 @@ const XButton = ({ onClick, disabled }) => (
 export default function FilePreview({
   file,
   previewUrl,
-  uploadState,  // 'selected' | 'uploading' | 'done' | 'failed'
+  uploadState,  // 'selected' | 'uploading' | 'done' | 'failed' | 'retrying'
   onRemove,
   onRetry,
   progress = 0,
@@ -160,43 +166,61 @@ export default function FilePreview({
       {/* Main Preview Card container */}
       <div
         style={{
-          display:       'flex',
-          alignItems:    'center',
-          gap:           '12px',
-          padding:       '8px 32px 8px 12px',
-          background:    isFailed
-            ? 'rgba(248,113,113,0.06)'
+          display:        'flex',
+          alignItems:     'center',
+          gap:            '12px',
+          padding:        '8px 36px 8px 10px',
+          background:     isFailed
+            ? 'rgba(239, 68, 68, 0.08)'
             : isRetrying
-            ? 'rgba(139,92,246,0.06)'
+            ? 'rgba(168, 85, 247, 0.08)'
             : '#18181b',
-          border:        `1px solid ${
-            isFailed    ? 'rgba(248,113,113,0.3)'
-            : isRetrying ? 'rgba(139,92,246,0.3)'
-            : 'rgba(255,255,255,0.08)'
+          border:         `1px solid ${
+            isFailed    ? 'rgba(239, 68, 68, 0.3)'
+            : isRetrying ? 'rgba(168, 85, 247, 0.35)'
+            : 'rgba(255, 255, 255, 0.1)'
           }`,
-          borderRadius:  '12px',
-          maxWidth:      '260px',
-          minWidth:      '200px',
-          height:        '52px',
-          boxSizing:     'border-box',
-          cursor:        (isFailed || isRetrying) ? 'pointer' : 'default',
-          position:      'relative',
+          borderRadius:   '12px',
+          maxWidth:       '260px',
+          minWidth:       '200px',
+          height:         '52px',
+          boxSizing:      'border-box',
+          cursor:         isFailed ? 'pointer' : 'default',
+          position:       'relative',
+          transition:     'all 0.2s ease',
         }}
-        onClick={(isFailed || isRetrying) ? onRetry : undefined}
-        title={isFailed ? 'Click to retry processing' : isRetrying ? 'Processing — please wait' : undefined}
+        onClick={isFailed ? onRetry : undefined}
+        title={isFailed ? 'Click to retry upload' : undefined}
       >
-        {/* Left container block (Image preview or Colored file box) */}
+        {/* Left container block (Image preview or Translucent file icon box) */}
         <div style={{
-          width:        '36px',
-          height:       '36px',
-          borderRadius: '8px',
-          overflow:     'hidden',
-          background:   isImage ? 'transparent' : color, // Use extension solid color for documents
-          position:     'relative',
-          display:      'flex',
-          alignItems:   'center',
+          width:          '36px',
+          height:         '36px',
+          borderRadius:   '8px',
+          overflow:       'hidden',
+          background:     isImage
+            ? 'transparent'
+            : isFailed
+            ? 'rgba(239, 68, 68, 0.15)'
+            : isRetrying
+            ? 'rgba(168, 85, 247, 0.15)'
+            : isUploading
+            ? 'rgba(255, 255, 255, 0.08)'
+            : `${color}18`, // 15% opacity tint matching file extension accent color
+          border:         isImage
+            ? 'none'
+            : `1px solid ${
+                isFailed
+                  ? 'rgba(239, 68, 68, 0.3)'
+                  : isRetrying
+                  ? 'rgba(168, 85, 247, 0.3)'
+                  : `${color}35`
+              }`,
+          position:       'relative',
+          display:        'flex',
+          alignItems:     'center',
           justifyContent: 'center',
-          flexShrink:   0,
+          flexShrink:     0,
         }}>
           {isImage ? (
             <>
@@ -222,33 +246,33 @@ export default function FilePreview({
                   alignItems:     'center',
                   justifyContent: 'center',
                 }}>
-                  <ProgressRing progress={progress} />
+                  <ProgressRing progress={progress} strokeColor="#a855f7" />
                 </div>
               )}
             </>
           ) : (
             <>
               {isUploading ? (
-                <ProgressRing progress={progress} />
+                <ProgressRing progress={progress} strokeColor="#a855f7" />
               ) : isRetrying ? (
-                // Pulsing orbit ring for retrying state
+                /* Pulsing ring for retrying state */
                 <div style={{
                   width: '20px',
                   height: '20px',
-                  border: '2px solid rgba(139,92,246,0.25)',
-                  borderTop: '2px solid #8b5cf6',
+                  border: '2px solid rgba(168, 85, 247, 0.25)',
+                  borderTop: '2px solid #a855f7',
                   borderRadius: '50%',
                   animation: 'progress-spin 0.9s linear infinite',
                 }} />
               ) : isFailed ? (
                 <Icon
                   icon="material-symbols:refresh-rounded"
-                  style={{ color: 'white', fontSize: '20px' }}
+                  style={{ color: '#ef4444', fontSize: '20px' }}
                 />
               ) : (
                 <Icon
                   icon={icon}
-                  style={{ fontSize: '20px', color: 'white' }}
+                  style={{ fontSize: '22px' }}
                 />
               )}
             </>
@@ -257,14 +281,14 @@ export default function FilePreview({
 
         {/* File Text Information */}
         <div style={{
-          flex:     1,
-          minWidth: 0,
-          paddingRight: '18px', // Space to prevent close button overlapping text
+          flex:         1,
+          minWidth:     0,
+          paddingRight: '12px',
         }}>
           <div style={{
             fontSize:     '13px',
             fontWeight:   600,
-            color:        isFailed ? '#f87171' : isRetrying ? '#a78bfa' : '#ffffff',
+            color:        isFailed ? '#f87171' : isRetrying ? '#c084fc' : '#f3f4f6',
             whiteSpace:   'nowrap',
             overflow:     'hidden',
             textOverflow: 'ellipsis',
@@ -273,16 +297,16 @@ export default function FilePreview({
             {file.name}
           </div>
           <div style={{
-            fontSize:  '11px',
-            color:     isFailed ? '#f87171' : isRetrying ? '#a78bfa' : '#9ca3af',
-            marginTop: '1px',
+            fontSize:   '11px',
+            color:      isFailed ? '#ef4444' : isRetrying ? '#a855f7' : '#9ca3af',
+            marginTop:  '1px',
             lineHeight: 1.2,
           }}>
             {statusText}
           </div>
         </div>
 
-        {/* Standardized smaller Close Button (nested inside relative parent) */}
+        {/* Standardized Close Button */}
         <XButton onClick={onRemove} />
       </div>
     </div>

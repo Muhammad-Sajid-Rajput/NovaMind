@@ -1,8 +1,6 @@
 // NovaMind — VersionNavigator.jsx
 // Shows < 1/2 > arrows below edited user messages
 
-import React from "react";
-
 const VersionNavigator = ({ 
   message, 
   onNavigate // (messageId, targetChildId) => void

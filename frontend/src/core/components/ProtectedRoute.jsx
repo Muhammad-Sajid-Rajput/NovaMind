@@ -14,10 +14,14 @@ export default function ProtectedRoute() {
   if (isLoading) return null;
 
   if (!user) {
+    // Sanitize state.from location to prevent open redirect attacks
+    const rawFrom = location.pathname + location.search + location.hash;
+    const safeFrom = rawFrom.startsWith("/") && !rawFrom.startsWith("//") ? location : { pathname: "/" };
+
     return (
       <Navigate
         to="/auth/login"
-        state={{ from: location }} // lets login page redirect back here after success
+        state={{ from: safeFrom }}
         replace
       />
     );

@@ -1,17 +1,15 @@
-// NovaMind — account.controller.js — Error System
+// NovaMind — account.controller.js
 // Account management: change password, delete account (cascade).
 
 import { asyncHandler } from "../../core/utils/asyncHandler.js";
-import { logger } from "../../core/utils/logger.js";
-import User from "./User.model.js";
-import Session from "../sessions/Session.model.js";
-import Message from "../messages/Message.model.js";
-import cloudinary from "../../core/config/cloudinary.js";
-import { deleteUserVectors } from "../../core/services/pineconeService.js";
-import Memory from "../memory/Memory.model.js";
-import FileRegistry from "../upload/models/FileRegistry.model.js";
-import DocumentChunk from "../upload/models/DocumentChunk.model.js";
-import DocumentManifest from "../upload/models/DocumentManifest.model.js";
+import { logger }       from "../../core/utils/logger.js";
+import User             from "./User.model.js";
+import Session          from "../sessions/Session.model.js";
+import Message          from "../messages/Message.model.js";
+import Memory           from "../memory/Memory.model.js";
+import { deleteUserVectors }                            from "../../core/services/pineconeService.js";
+import { clearRefreshCookie }                           from "./cookieHelper.js";
+import { deleteAllUserDocuments, deleteCloudinaryAssetsForMessages } from "../upload/cleanupHelper.js";
 
 // ─── PATCH /api/auth/change-password ─────────────────────────────────────────
 export const changePassword = asyncHandler(async (req, res) => {
@@ -43,12 +41,7 @@ export const changePassword = asyncHandler(async (req, res) => {
   await user.save();
 
   // Clear the refresh cookie — user must log in again on all devices
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure:   process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-    path:     "/",
-  });
+  clearRefreshCookie(res);
 
   logger.info("[ChangePassword] Password updated for user:", { userId: req.user.id });
 
@@ -80,117 +73,55 @@ export const deleteAccount = asyncHandler(async (req, res) => {
     return res.status(400).json({ error: "Incorrect password. Account deletion requires your current password." });
   }
 
-  // ── Cascade delete ─────────────────────────────────────────────────────────
-  // 1. Find all sessions owned by this user
+  // ── 1. Find all sessions owned by this user ─────────────────────────────────
   const sessions   = await Session.find({ userId }).select("_id").lean();
   const sessionIds = sessions.map((s) => s._id);
 
-  // 2. Find and delete all Cloudinary image/file attachments for this user
+  // ── 2. Delete Cloudinary image/file attachments from messages ───────────────
   try {
     const messagesWithAttachments = await Message.find({
       sessionId: { $in: sessionIds },
       $or: [
         { "image.publicId": { $exists: true, $ne: null } },
-        { "file.publicId": { $exists: true, $ne: null } }
-      ]
+        { "file.publicId":  { $exists: true, $ne: null } },
+      ],
     }).select("image.publicId file.publicId file.resourceType").lean();
 
-    const imageIds = [];
-    const rawIds = [];
-
-    for (const m of messagesWithAttachments) {
-      if (m.image?.publicId) {
-        imageIds.push(m.image.publicId);
-      }
-      if (m.file?.publicId) {
-        if (m.file.resourceType === 'raw') {
-          rawIds.push(m.file.publicId);
-        } else {
-          imageIds.push(m.file.publicId);
-        }
-      }
-    }
-
-    if (imageIds.length > 0) {
-      logger.info(`[DeleteAccount] Deleting ${imageIds.length} Cloudinary image assets for user: ${userId}`);
-      await cloudinary.api.delete_resources(imageIds, { resource_type: 'image' });
-    }
-    if (rawIds.length > 0) {
-      logger.info(`[DeleteAccount] Deleting ${rawIds.length} Cloudinary raw assets for user: ${userId}`);
-      await cloudinary.api.delete_resources(rawIds, { resource_type: 'raw' });
-    }
+    await deleteCloudinaryAssetsForMessages(messagesWithAttachments);
   } catch (err) {
-    logger.error("[DeleteAccount] Failed to delete Cloudinary assets for user:", {
-      userId,
-      error: err.message
-    });
+    logger.error("[DeleteAccount] Failed to delete Cloudinary message assets:", { userId, error: err.message });
   }
 
-  // 3. Delete all messages from those sessions
+  // ── 3. Delete all messages from those sessions ──────────────────────────────
   if (sessionIds.length > 0) {
     await Message.deleteMany({ sessionId: { $in: sessionIds } });
   }
 
-  // 4. Delete all sessions
+  // ── 4. Delete all sessions ──────────────────────────────────────────────────
   await Session.deleteMany({ userId });
 
-  // 4b. Delete all User Memories from MongoDB
+  // ── 5. Delete all user memories from MongoDB ────────────────────────────────
   try {
     await Memory.deleteMany({ userId });
     logger.info(`[DeleteAccount] Deleted all user memories for user: ${userId}`);
   } catch (err) {
-    logger.error("[DeleteAccount] Failed to delete memories for user:", {
-      userId,
-      error: err.message
-    });
+    logger.error("[DeleteAccount] Failed to delete memories:", { userId, error: err.message });
   }
 
-  // 4c. Delete all uploaded documents, chunks, manifests, and Cloudinary raw files
-  try {
-    const registries = await FileRegistry.find({ userId }).select("documentId publicId").lean();
-    const documentIds = registries.map((r) => r.documentId).filter(Boolean);
-    const rawIds = registries.map((r) => r.publicId).filter(Boolean);
+  // ── 6. Delete all uploaded documents (Cloudinary + chunks + manifests + registry) ─
+  await deleteAllUserDocuments(userId);
 
-    if (rawIds.length > 0) {
-      logger.info(`[DeleteAccount] Deleting ${rawIds.length} Cloudinary raw document assets for user: ${userId}`);
-      await cloudinary.api.delete_resources(rawIds, { resource_type: 'raw' });
-    }
-
-    await DocumentChunk.deleteMany({ userId });
-
-    if (documentIds.length > 0) {
-      await DocumentManifest.deleteMany({ documentId: { $in: documentIds } });
-    }
-
-    await FileRegistry.deleteMany({ userId });
-    logger.info(`[DeleteAccount] Deleted all file registries, chunks, and manifests for user: ${userId}`);
-  } catch (err) {
-    logger.error("[DeleteAccount] Failed to delete file registries / chunks for user:", {
-      userId,
-      error: err.message
-    });
-  }
-
-  // 5. Delete all vectors from Pinecone
+  // ── 7. Delete all Pinecone vectors ──────────────────────────────────────────
   try {
     await deleteUserVectors(userId.toString());
   } catch (err) {
-    logger.error("[DeleteAccount] Failed to delete Pinecone vectors for user:", {
-      userId,
-      error: err.message
-    });
+    logger.error("[DeleteAccount] Failed to delete Pinecone vectors:", { userId, error: err.message });
   }
 
-  // 6. Delete the user document itself
+  // ── 8. Delete the user document itself ──────────────────────────────────────
   await User.findByIdAndDelete(userId);
 
-  // 5. Clear auth cookie
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure:   process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-    path:     "/",
-  });
+  clearRefreshCookie(res);
 
   logger.info("[DeleteAccount] Account and all data deleted for user:", { userId });
 
@@ -200,8 +131,7 @@ export const deleteAccount = asyncHandler(async (req, res) => {
   });
 });
 
-// PATCH /api/auth/profile
-// Updates the user's name
+// ─── PATCH /api/auth/profile ──────────────────────────────────────────────────
 export const updateProfile = asyncHandler(async (req, res) => {
   const { name } = req.body;
 
@@ -220,10 +150,7 @@ export const updateProfile = asyncHandler(async (req, res) => {
   user.name = name.trim();
   await user.save();
 
-  logger.info("[UpdateProfile] Profile updated for user:", { userId: req.user.id, name: user.name });
+  logger.info("[UpdateProfile] Profile updated:", { userId: req.user.id, name: user.name });
 
-  res.status(200).json({
-    success: true,
-    user,
-  });
+  res.status(200).json({ success: true, user });
 });

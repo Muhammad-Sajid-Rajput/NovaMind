@@ -37,6 +37,8 @@ export const MODELS = [
   }
 ];
 
+export const DEFAULT_MODEL_ID = MODELS[0].id;
+
 export const STORAGE_KEYS = {
   THEME: "chat_theme",
   SESSIONS: "sessions_list",

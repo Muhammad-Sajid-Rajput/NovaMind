@@ -1,8 +1,19 @@
 // NovaMind — MessageActions.jsx — File Upload Bug Fix
 import { useState, useEffect, useCallback } from "react";
+
+const stripMarkdown = (text) =>
+  text
+    .replace(/`{3,}[\s\S]*?`{3,}/g, "")
+    .replace(/(\*\*|__)(.*?)\1/g, "$2")
+    .replace(/(\*|_)(.*?)\1/g, "$2")
+    .replace(/`(.+?)`/g, "$1")
+    .replace(/^[#\s]+(.*)$/gm, "$1")
+    .replace(/^[>\s]+(.*)$/gm, "$1")
+    .replace(/[\[\]\(\)]/g, "");
 import { Icon } from "@iconify/react";
 import { useChatContext } from "../context/ChatContext.jsx";
 import VersionNavigator from "./VersionNavigator.jsx";
+import { useCopyToClipboard } from "../../../core/hooks/useCopyToClipboard.js";
 
 const MODELS_LABELS = {
   "gemini-3.5-flash": "Gemini 3.5 Flash",
@@ -37,7 +48,7 @@ function MessageActions({
 }) {
   const { setEditingMessageId } = useChatContext();
 
-  const [copied, setCopied] = useState(false);
+  const [copied, copy] = useCopyToClipboard();
   const [isSpeaking, setIsSpeaking] = useState(false);
 
   const isTtsSupported = typeof window !== "undefined" && "speechSynthesis" in window;
@@ -52,22 +63,10 @@ function MessageActions({
   }, [isTtsSupported]);
 
   const handleCopy = useCallback(() => {
-    if (copied) return;
-    navigator.clipboard.writeText(message);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 5000);
-  }, [message, copied]);
+    copy(message);
+  }, [message, copy]);
 
-  const stripMarkdown = useCallback((text) => {
-    return text
-      .replace(/`{3,}[\s\S]*?`{3,}/g, "")
-      .replace(/(\*\*|__)(.*?)\1/g, "$2")
-      .replace(/(\*|_)(.*?)\1/g, "$2")
-      .replace(/`(.+?)`/g, "$1")
-      .replace(/^[#\s]+(.*)$/gm, "$1")
-      .replace(/^[>\s]+(.*)$/gm, "$1")
-      .replace(/[\[\]\(\)]/g, "");
-  }, []);
+  // stripMarkdown is now a module-level pure function (above)
 
   const handleSpeak = useCallback(() => {
     if (!isTtsSupported) return;
@@ -87,7 +86,7 @@ function MessageActions({
 
       window.speechSynthesis.speak(utterance);
     }
-  }, [isTtsSupported, isSpeaking, message, stripMarkdown]);
+  }, [isTtsSupported, isSpeaking, message]);
 
 
 

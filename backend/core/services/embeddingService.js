@@ -36,7 +36,7 @@ export const embedText = async (text, retries = 5, backoff = 2000) => {
     try {
       const result = await embeddingModel.embedContent({
         content: { parts: [{ text }] },
-        outputDimensionality: 786
+        outputDimensionality: 768
       });
       return result.embedding.values; // float32 array
     } catch (err) {
@@ -70,7 +70,7 @@ const embedBatchChunk = async (chunk) => {
         requests: chunk.map(t => ({
           model: 'models/gemini-embedding-2',
           content: { parts: [{ text: t }] },
-          outputDimensionality: 786
+          outputDimensionality: 768
         }))
       });
 
@@ -109,7 +109,7 @@ const embedSequential = async (texts) => {
       vectors.push(vector);
     } catch (seqErr) {
       logger.error('Sequential fallback embedding permanently failed', { error: seqErr.message });
-      vectors.push(new Array(786).fill(0)); // fail-safe zero vector
+      vectors.push(new Array(768).fill(0)); // fail-safe zero vector
     }
     // Pace sequential requests to stay safely under 100 RPM
     await delay(SEQUENTIAL_DELAY_MS);
@@ -151,6 +151,3 @@ export const batchEmbedTexts = async (texts) => {
 
   return embeddings;
 };
-
-// Keep old wrapper for backward compatibility
-export const embedBatch = batchEmbedTexts;

@@ -38,7 +38,7 @@ export const checkUploadQuota = async ({ userId, sessionId, messageId, fileName,
 
       let matchCount = 0;
       for (const reg of registries) {
-        if (getDocumentType(reg.fileName) === docType) {
+        if (getDocumentType(reg.fileName, reg.fileType || '') === docType) {
           matchCount++;
         }
       }
@@ -203,13 +203,14 @@ export const ingestDocument = asyncHandler(async (req, res) => {
 // Checks progress of ingestion job
 export const getIngestStatus = asyncHandler(async (req, res) => {
   const { jobId } = req.params;
+  const userId = req.user.id;
 
   const job = await ingestQueue.getJob(jobId);
 
   // Job not found in BullMQ — it may have been cleaned up after completion
   // (removeOnComplete eviction). Fall back to FileRegistry for ground truth.
   if (!job) {
-    const registry = await FileRegistry.findOne({ jobId }).sort({ createdAt: -1 });
+    const registry = await FileRegistry.findOne({ jobId, userId }).sort({ createdAt: -1 });
 
     // If FileRegistry shows a terminal state, synthesize the response
     if (registry?.status === 'Completed') {

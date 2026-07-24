@@ -377,8 +377,10 @@ export default memo(ChatMessage, (prevProps, nextProps) => {
     prevProps.message === nextProps.message &&
     prevProps.sender === nextProps.sender &&
     prevProps.time === nextProps.time &&
+    prevProps.createdAt === nextProps.createdAt &&
     prevProps.image === nextProps.image &&
     prevProps.file === nextProps.file &&
+    prevProps.files === nextProps.files &&
     prevProps.isStreaming === nextProps.isStreaming &&
     prevProps.isLastBotMessage === nextProps.isLastBotMessage &&
     prevProps.model === nextProps.model &&
@@ -388,3 +390,4 @@ export default memo(ChatMessage, (prevProps, nextProps) => {
     JSON.stringify(prevProps.versionInfo) === JSON.stringify(nextProps.versionInfo)
   );
 });
+

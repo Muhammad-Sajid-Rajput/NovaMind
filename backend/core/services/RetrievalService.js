@@ -3,6 +3,7 @@ import { searchVectors } from './pineconeService.js';
 import { embedText } from './embeddingService.js';
 import DocumentChunk from '../../modules/upload/models/DocumentChunk.model.js';
 import { logger } from '../utils/logger.js';
+import { getModelWithKey } from '../utils/keyManager.js';
 
 /**
  * Rewrites a conversation-dependent question into a standalone descriptive query.
@@ -13,7 +14,6 @@ const rewriteQuery = async (userMessage, chatHistory) => {
   }
 
   try {
-    const { getModelWithKey } = await import('../utils/keyManager.js');
     const { model, reportSuccess, reportFailure } = getModelWithKey('gemini-3.1-flash-lite');
 
     // Build history transcript

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { api } from "../../../config/api.js";
+import { DEFAULT_MODEL_ID } from "../../../core/constants/index.js";
 
 const PASSWORD_COMMAND = "give me a unique key or password";
 
@@ -30,9 +31,12 @@ export function useStream({
   const chunkBufferRef = useRef("");
   const timerRef = useRef(null);
 
+  const isAbortedRef = useRef(false);
+
   // Cleanup throttled timer on unmount
   useEffect(() => {
     return () => {
+      isAbortedRef.current = true;
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
@@ -49,6 +53,7 @@ export function useStream({
   }, [countdown]);
 
   const stopGeneration = () => {
+    isAbortedRef.current = true;
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -257,7 +262,7 @@ export function useStream({
           sessionId: activeSessionId,
           language,
           contextLimit,
-          model,
+          model: model || DEFAULT_MODEL_ID,
           history: historyToSend,
           isRagSession: isRagSession,
           file: file,
@@ -331,6 +336,7 @@ export function useStream({
       return;
     }
 
+    isAbortedRef.current = false;
     setIsStreaming(true);
 
     setChatMessages((prev) => {
@@ -346,7 +352,7 @@ export function useStream({
     let streamedText = "";
 
     const flushBuffer = () => {
-      if (!chunkBufferRef.current) {
+      if (isAbortedRef.current || !chunkBufferRef.current) {
         timerRef.current = null;
         return;
       }
@@ -398,7 +404,7 @@ export function useStream({
         sessionId: activeSessionId,
         language,
         contextLimit,
-        model,
+        model: model || DEFAULT_MODEL_ID,
         history: historyToSend,
         isRagSession: isRagSession,
         file: file,

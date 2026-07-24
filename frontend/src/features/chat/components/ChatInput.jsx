@@ -128,6 +128,7 @@ function ChatInput() {
   isLoadingRef.current            = isLoading;
   isStreamingRef.current          = isStreaming;
   isSwitchingBranchRef.current    = !!isSwitchingBranch;
+  attachedFilesRef.current        = attachedFiles;
 
   const handleTranscript = useCallback((transcript) => {
     setInputText((prev) => prev + (prev ? " " : "") + transcript);
@@ -683,9 +684,9 @@ function ChatInput() {
 
     const nextRetryCount = currentRetry + 1;
     updateFileStateAndStorage(id, {
-      uploadState: 'retrying',
+      uploadState: 'uploading',
       ingestRetryCount: nextRetryCount,
-      progress: 0,
+      progress: 10,
       error: '',
     });
 
@@ -694,12 +695,7 @@ function ChatInput() {
       await new Promise(r => setTimeout(r, 2000 * nextRetryCount));
     }
 
-    let currentItem;
-    setAttachedFiles(prev => {
-      currentItem = prev.find(f => f.id === id);
-      return prev;
-    });
-
+    const currentItem = attachedFilesRef.current.find(f => f.id === id);
     if (!currentItem || !currentItem.ingestJobData) return;
 
     try {
@@ -788,23 +784,16 @@ function ChatInput() {
     }
   };
 
-  // ── Retry manual (user clicks failed card) ──────────────────────────────────
   const handleRetrySingleUpload = (id) => {
-    let currentItem;
-    setAttachedFiles(prev => {
-      currentItem = prev.find(f => f.id === id);
-      return prev;
-    });
+    const currentItem = attachedFilesRef.current.find(f => f.id === id);
     if (!currentItem) return;
 
-    if (currentItem.ingestJobData) {
+    const originalFileObj = originalFilesMapRef.current[id];
+    if (originalFileObj) {
+      uploadSingleFile(originalFileObj, id);
+    } else if (currentItem.ingestJobData) {
       updateFileStateAndStorage(id, { ingestRetryCount: 0 });
       retrySingleIngest(id, 'Manual retry by user', 0, true);
-    } else {
-      const originalFileObj = originalFilesMapRef.current[id];
-      if (originalFileObj) {
-        uploadSingleFile(originalFileObj, id);
-      }
     }
   };
 

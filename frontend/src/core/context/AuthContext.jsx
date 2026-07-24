@@ -12,6 +12,13 @@ import {
 } from "react";
 import { setAccessToken, api } from "../../config/api.js";
 
+const clearLocalCache = () => {
+  localStorage.removeItem("sessions_list");
+  localStorage.removeItem("sessions_messages");
+  localStorage.removeItem("pinned_messages");
+  localStorage.removeItem("sessions_drafts");
+  localStorage.removeItem("current_session_id");
+};
 
 const AuthContext = createContext(null);
 const BASE        = import.meta.env.VITE_API_URL || "/api";
@@ -37,13 +44,7 @@ export function AuthProvider({ children }) {
   // ── Listen for force-logout broadcast from apiFetch interceptor ─────────────
   useEffect(() => {
     const handleForceLogout = () => {
-      // Clear cached chat details to prevent leak
-      localStorage.removeItem("sessions_list");
-      localStorage.removeItem("sessions_messages");
-      localStorage.removeItem("pinned_messages");
-      localStorage.removeItem("sessions_drafts");
-      localStorage.removeItem("current_session_id");
-
+      clearLocalCache();
       updateAccessToken(null);
       setUser(null);
     };
@@ -87,129 +88,64 @@ export function AuthProvider({ children }) {
 
   // ── Login ───────────────────────────────────────────────────────────────────
   const login = useCallback(async (email, password) => {
-    const res  = await fetch(`${BASE}/auth/login`, {
-      method:      "POST",
-      credentials: "include",
-      headers:     { "Content-Type": "application/json" },
-      body:        JSON.stringify({ email, password }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      const err                   = new Error(data.error || "Login failed");
-      err.requiresVerification    = data.requiresVerification || false;
-      err.email                   = data.email || email;
+    try {
+      const data = await api.auth.login(email, password);
+      clearLocalCache();
+      updateAccessToken(data.accessToken);
+      setUser(data.user);
+      return data;
+    } catch (err) {
+      if (err.data) {
+        err.requiresVerification = err.data.requiresVerification || false;
+        err.email = err.data.email || email;
+      }
       throw err;
     }
-    // Clear cached chat details to prevent leak
-    localStorage.removeItem("sessions_list");
-    localStorage.removeItem("sessions_messages");
-    localStorage.removeItem("pinned_messages");
-    localStorage.removeItem("sessions_drafts");
-    localStorage.removeItem("current_session_id");
-
-    updateAccessToken(data.accessToken);
-    setUser(data.user);
-    return data;
   }, [updateAccessToken]);
 
   // ── Register (does not log in — user must verify email first) ────────────────
   const register = useCallback(async (email, password, name) => {
-    const res  = await fetch(`${BASE}/auth/register`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ email, password, name }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Registration failed");
-    return data; // { message, email }
+    return await api.auth.register(email, password, name);
   }, []);
 
   // ── Verify Email OTP (does not log in — user must sign in manually next) ─────
   const verifyEmail = useCallback(async (email, code) => {
-    const res  = await fetch(`${BASE}/auth/verify-email`, {
-      method:      "POST",
-      headers:     { "Content-Type": "application/json" },
-      body:        JSON.stringify({ email, code }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Verification failed");
-    return data;
+    return await api.auth.verifyEmail(email, code);
   }, []);
 
   // ── Resend OTP ───────────────────────────────────────────────────────────────
   const resendOtp = useCallback(async (email) => {
-    const res  = await fetch(`${BASE}/auth/resend-otp`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ email }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Failed to resend code");
-    return data;
+    return await api.auth.resendOtp(email);
   }, []);
 
   // ── Forgot Password ──────────────────────────────────────────────────────────
   const forgotPassword = useCallback(async (email) => {
-    const res  = await fetch(`${BASE}/auth/forgot-password`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ email }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Failed to request reset code");
-    return data;
+    return await api.auth.forgotPassword(email);
   }, []);
 
   // ── Verify Reset Code ────────────────────────────────────────────────────────
   const verifyResetCode = useCallback(async (email, code) => {
-    const res  = await fetch(`${BASE}/auth/verify-reset-code`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ email, code }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Failed to verify reset code");
-    return data;
+    return await api.auth.verifyResetCode(email, code);
   }, []);
 
   // ── Reset Password ───────────────────────────────────────────────────────────
   const resetPassword = useCallback(async (email, code, newPassword) => {
-    const res  = await fetch(`${BASE}/auth/reset-password`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ email, code, newPassword }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Failed to reset password");
-    return data;
+    return await api.auth.resetPassword(email, code, newPassword);
   }, []);
 
   // ── Logout ───────────────────────────────────────────────────────────────────
   const logout = useCallback(async () => {
     try {
-      // Ask server to clear the httpOnly refreshToken cookie
-      await fetch(`${BASE}/auth/logout`, {
-        method:      "POST",
-        credentials: "include",
-        headers:     accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-      });
+      await api.auth.logout();
     } catch {
-      // Even if the request fails, clear local state
+      // Even if network request fails, clear local state
     } finally {
-      // Clear cached chat details to prevent leak
-      localStorage.removeItem("sessions_list");
-      localStorage.removeItem("sessions_messages");
-      localStorage.removeItem("pinned_messages");
-      localStorage.removeItem("sessions_drafts");
-      localStorage.removeItem("current_session_id");
-
+      clearLocalCache();
       updateAccessToken(null);
       setUser(null);
-
-      // Redirect to landing page — full navigation clears all in-memory state
       window.location.href = "/";
     }
-  }, [accessToken, updateAccessToken]);
+  }, [updateAccessToken]);
 
 
 
@@ -226,14 +162,7 @@ export function AuthProvider({ children }) {
   // user out locally if the network request fails.
   const deleteAccount = useCallback(async (password) => {
     await api.auth.deleteAccount(password);
-
-    // Only clear local state after confirmed server deletion
-    localStorage.removeItem("sessions_list");
-    localStorage.removeItem("sessions_messages");
-    localStorage.removeItem("pinned_messages");
-    localStorage.removeItem("sessions_drafts");
-    localStorage.removeItem("current_session_id");
-
+    clearLocalCache();
     updateAccessToken(null);
     setUser(null);
   }, [updateAccessToken]);

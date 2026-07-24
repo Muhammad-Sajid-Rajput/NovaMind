@@ -6,9 +6,9 @@ import Message from "../messages/Message.model.js";
 import * as geminiService from "../../core/services/geminiService.js";
 import { handleSSEStream } from "./services/streamService.js";
 import { processVisionMessage } from "./services/visionService.js";
-import { withFallback, getTelemetryStatus, getCooldownStatus } from "./utils/modelFallback.js";
+import { withFallback, getTelemetryStatus, getCooldownStatus, ALLOWED_MODELS } from "./utils/modelFallback.js";
 import { asyncHandler } from "../../core/utils/asyncHandler.js";
-import { getModel } from "../../core/config/gemini.js";
+import { getModelWithKey as getModel } from "../../core/utils/keyManager.js";
 import { logger } from "../../core/utils/logger.js";
 import { retrieveContext } from "../../core/services/RetrievalService.js";
 import { searchWeb, formatSearchResults } from "../../core/services/tavilyService.js";
@@ -24,6 +24,53 @@ import {
   modelUsageTotal,
 } from "../../core/config/metrics.js";
 import { getDocumentType } from "../upload/upload.controller.js";
+
+// ── Shared helpers ───────────────────────────────────────────────────────────────────────────────
+const deriveFilesArray = (files, file) =>
+  files && Array.isArray(files) ? files : (file ? [file] : []);
+
+const checkDailyImageLimit = async (userId, incomingImages) => {
+  if (!incomingImages.length) return null;
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const userMessages = await Message.find({ userId, createdAt: { $gte: oneDayAgo } });
+  let dailyImageCount = 0;
+  for (const msg of userMessages) {
+    if (msg.files?.length) {
+      for (const f of msg.files) {
+        if (getDocumentType(f.originalName, f.mimeType) === 'image') dailyImageCount++;
+      }
+    } else if (msg.image?.url) {
+      dailyImageCount++;
+    }
+  }
+  if ((dailyImageCount + incomingImages.length) > 2) {
+    return `Daily limit reached. You can only upload up to 2 images per day. (You have already uploaded ${dailyImageCount} today)`;
+  }
+  return null;
+};
+
+const fetchImageParts = async (images) => {
+  const parts = [];
+  for (const img of images) {
+    try {
+      const response = await fetch(img.url);
+      if (!response.ok) {
+        logger.error('Failed to download image for Gemini prompt', { url: img.url });
+        continue;
+      }
+      const buffer = Buffer.from(await response.arrayBuffer());
+      parts.push({
+        inlineData: {
+          data: buffer.toString("base64"),
+          mimeType: response.headers.get("content-type") || img.mimeType || "image/png"
+        }
+      });
+    } catch (err) {
+      logger.error('Error fetching image for Gemini prompt', { url: img.url, error: err.message });
+    }
+  }
+  return parts;
+};
 
 const generateSessionName = async (userMessage, botReply) => {
   try {
@@ -65,7 +112,7 @@ const generateSessionName = async (userMessage, botReply) => {
   }
 };
 
-const DEFAULT_MODEL = "gemini-3.5-flash";
+const DEFAULT_MODEL = ALLOWED_MODELS[0];
 
 function sanitizeText(text) {
   if (typeof text !== "string") return "";
@@ -300,63 +347,36 @@ async function prepareMessageContext({ message, sessionId, model, language, cont
   return { cleanMessage, sid, history, isFirstMessage, preferredModelName };
 }
 
-export const sendMessage = asyncHandler(async (req, res) => {
-  const { message, sessionId, model, language, contextLimit, history: incomingHistory, isRagSession, file, files, parentMessageId, skipAppend } = req.body;
+async function prepareChatRequest(req, res) {
+  const { message, sessionId, model, language, contextLimit, history: incomingHistory, isRagSession, file, files, parentMessageId } = req.body;
   const userId = req.user.id;
 
-  // ── Limit 1: User can upload only 2 files in one message ────────────────────
-  const filesArray = files && Array.isArray(files) ? files : (file ? [file] : []);
+  const filesArray = deriveFilesArray(files, file);
   if (filesArray.length > 2) {
-    return res.status(400).json({
-      error: 'You can only upload up to 2 files per message.'
-    });
+    res.status(400).json({ error: 'You can only upload up to 2 files per message.' });
+    return null;
   }
 
-  // ── Limit 2: Daily limit of 2 files of each document type ────────────────────
   const incomingImages = filesArray.filter(f => getDocumentType(f.originalName, f.mimeType) === 'image');
-  if (incomingImages.length > 0) {
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const userMessages = await Message.find({
-      userId,
-      createdAt: { $gte: oneDayAgo }
-    });
-
-    let dailyImageCount = 0;
-    for (const msg of userMessages) {
-      if (msg.files && msg.files.length > 0) {
-        for (const f of msg.files) {
-          if (getDocumentType(f.originalName, f.mimeType) === 'image') {
-            dailyImageCount++;
-          }
-        }
-      } else if (msg.image && msg.image.url) {
-        dailyImageCount++;
-      }
-    }
-
-    if ((dailyImageCount + incomingImages.length) > 2) {
-      return res.status(400).json({
-        error: `Daily limit reached. You can only upload up to 2 images per day. (You have already uploaded ${dailyImageCount} today)`
-      });
-    }
+  const imageError = await checkDailyImageLimit(userId, incomingImages);
+  if (imageError) {
+    res.status(400).json({ error: imageError });
+    return null;
   }
 
   let ctx;
   try {
     ctx = await prepareMessageContext({ message, sessionId, model, language, contextLimit, incomingHistory, userId, parentMessageId });
   } catch (err) {
-    if (err.statusCode === 400) return res.status(400).json({ error: err.message });
+    if (err.statusCode === 400) {
+      res.status(400).json({ error: err.message });
+      return null;
+    }
     throw err;
   }
 
   const { cleanMessage, sid, history, isFirstMessage, preferredModelName } = ctx;
-
-  // ── Phase 5: Inject user memories into system instruction ─────────────────
-  // memoryContext → goes into the Gemini system instruction (persistent persona context)
-  // extraContext  → RAG / web search results → stays in user message body
   const memoryContext = await getUserMemoriesForPrompt(userId.toString());
-
-  // Build RAG + web search context
   const extraContext = await buildContext({
     message: cleanMessage,
     sessionId,
@@ -365,37 +385,45 @@ export const sendMessage = asyncHandler(async (req, res) => {
     history,
   });
 
-  // Only RAG/search context goes into the message body
   const enrichedMessage = extraContext
     ? `${extraContext}\n\nUser Question: ${cleanMessage}`
     : cleanMessage;
 
-  messagesSentTotal.inc();
-
-  // Convert uploaded images to base64 parts for the Gemini API
   const images = filesArray.filter(f => getDocumentType(f.originalName, f.mimeType) === 'image');
-  const imageParts = [];
-  if (images.length > 0) {
-    for (const img of images) {
-      try {
-        const response = await fetch(img.url);
-        if (!response.ok) {
-          logger.error('Failed to download image for Gemini prompt', { url: img.url });
-          continue;
-        }
-        const buffer = Buffer.from(await response.arrayBuffer());
-        const mimeType = response.headers.get("content-type") || img.mimeType || "image/png";
-        imageParts.push({
-          inlineData: {
-            data: buffer.toString("base64"),
-            mimeType
-          }
-        });
-      } catch (err) {
-        logger.error('Error fetching image for Gemini prompt', { url: img.url, error: err.message });
-      }
-    }
-  }
+  const nonImages = filesArray.filter(f => getDocumentType(f.originalName, f.mimeType) !== 'image');
+  const imageParts = await fetchImageParts(images);
+
+  return {
+    userId,
+    sessionId,
+    cleanMessage,
+    sid,
+    history,
+    isFirstMessage,
+    preferredModelName,
+    memoryContext,
+    enrichedMessage,
+    filesArray,
+    images,
+    nonImages,
+    imageParts,
+    parentMessageId,
+    skipAppend: req.body.skipAppend,
+    language,
+  };
+}
+
+export const sendMessage = asyncHandler(async (req, res) => {
+  const chatReq = await prepareChatRequest(req, res);
+  if (!chatReq) return;
+
+  const {
+    userId, sessionId, cleanMessage, sid, history, isFirstMessage, preferredModelName,
+    memoryContext, enrichedMessage, filesArray, images, nonImages, imageParts,
+    parentMessageId, skipAppend, language
+  } = chatReq;
+
+  messagesSentTotal.inc();
 
   const { result: reply, modelUsed } = await withFallback(
     (m) => {
@@ -423,12 +451,6 @@ export const sendMessage = asyncHandler(async (req, res) => {
 
   const time = getTimeString();
 
-  const nonImages = filesArray.filter(f => getDocumentType(f.originalName, f.mimeType) !== 'image');
-
-  // skipAppend is true when this request originates from an edit-branch
-  // flow. The branch node (user message) already exists in MongoDB — skip
-  // creating a duplicate. Use parentMessageId as the ID of that existing
-  // user message so the bot response attaches as its child.
   let userMsgId;
   if (skipAppend) {
     userMsgId = parentMessageId;
@@ -446,7 +468,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
     userMsgId = userMsgDoc._id;
   }
 
-  const botMsgDoc = await SessionStore.addMessage(sid, userId, {
+  await SessionStore.addMessage(sid, userId, {
     id: crypto.randomUUID(),
     parentMessageId: userMsgId,
     sender: "robot",
@@ -459,7 +481,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
   // Explicit path ("remember that…") → guaranteed save, no LLM judgment gate.
   // Implicit path → best-effort LLM extraction, may return [].
   let finalReply = reply;
-  if (await isExplicitSaveRequest(cleanMessage)) {
+  if (isExplicitSaveRequest(cleanMessage)) {
     const saveResult = await saveExplicitMemory({
       userId: userId.toString(),
       userMessage: cleanMessage,
@@ -477,108 +499,21 @@ export const sendMessage = asyncHandler(async (req, res) => {
 });
 
 export const sendStream = asyncHandler(async (req, res) => {
-  const { message, sessionId, model, language, contextLimit, history: incomingHistory, isRagSession, file, files, parentMessageId, skipAppend } = req.body;
-  const userId = req.user.id;
+  const chatReq = await prepareChatRequest(req, res);
+  if (!chatReq) return;
 
-  // ── Limit 1: User can upload only 2 files in one message ────────────────────
-  const filesArray = files && Array.isArray(files) ? files : (file ? [file] : []);
-  if (filesArray.length > 2) {
-    return res.status(400).json({
-      error: 'You can only upload up to 2 files per message.'
-    });
-  }
-
-  // ── Limit 2: Daily limit of 2 files of each document type ────────────────────
-  const incomingImages = filesArray.filter(f => getDocumentType(f.originalName, f.mimeType) === 'image');
-  if (incomingImages.length > 0) {
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const userMessages = await Message.find({
-      userId,
-      createdAt: { $gte: oneDayAgo }
-    });
-
-    let dailyImageCount = 0;
-    for (const msg of userMessages) {
-      if (msg.files && msg.files.length > 0) {
-        for (const f of msg.files) {
-          if (getDocumentType(f.originalName, f.mimeType) === 'image') {
-            dailyImageCount++;
-          }
-        }
-      } else if (msg.image && msg.image.url) {
-        dailyImageCount++;
-      }
-    }
-
-    if ((dailyImageCount + incomingImages.length) > 2) {
-      return res.status(400).json({
-        error: `Daily limit reached. You can only upload up to 2 images per day. (You have already uploaded ${dailyImageCount} today)`
-      });
-    }
-  }
-
-  let ctx;
-  try {
-    ctx = await prepareMessageContext({ message, sessionId, model, language, contextLimit, incomingHistory, userId, parentMessageId });
-  } catch (err) {
-    if (err.statusCode === 400) return res.status(400).json({ error: err.message });
-    throw err;
-  }
-
-  const { cleanMessage, sid, history, isFirstMessage, preferredModelName } = ctx;
-
-  // ── Phase 5: Inject user memories into system instruction ─────────────────
-  // memoryContext → goes into the Gemini system instruction (persistent persona context)
-  // extraContext  → RAG / web search results → stays in user message body
-  const memoryContext = await getUserMemoriesForPrompt(userId.toString());
-
-  // Build RAG + web search context
-  const extraContext = await buildContext({
-    message: cleanMessage,
-    sessionId,
-    userId: userId.toString(),
-    isRagSession: isRagSession !== false,
-  });
-
-  // Only RAG/search context goes into the message body
-  const enrichedMessage = extraContext
-    ? `${extraContext}\n\nUser Question: ${cleanMessage}`
-    : cleanMessage;
+  const {
+    userId, sessionId, cleanMessage, sid, history, isFirstMessage, preferredModelName,
+    memoryContext, enrichedMessage, filesArray, images, nonImages, imageParts,
+    parentMessageId, skipAppend, language
+  } = chatReq;
 
   activeStreams.inc();
   messagesSentTotal.inc();
 
-  // Convert uploaded images to base64 parts for the Gemini API
-  const images = filesArray.filter(f => getDocumentType(f.originalName, f.mimeType) === 'image');
-  const imageParts = [];
-  if (images.length > 0) {
-    for (const img of images) {
-      try {
-        const response = await fetch(img.url);
-        if (!response.ok) {
-          logger.error('Failed to download image for Gemini prompt', { url: img.url });
-          continue;
-        }
-        const buffer = Buffer.from(await response.arrayBuffer());
-        const mimeType = response.headers.get("content-type") || img.mimeType || "image/png";
-        imageParts.push({
-          inlineData: {
-            data: buffer.toString("base64"),
-            mimeType
-          }
-        });
-      } catch (err) {
-        logger.error('Error fetching image for Gemini prompt', { url: img.url, error: err.message });
-      }
-    }
-  }
-
-  let streamModelUsed = preferredModelName;
-
   try {
     const { result: streamIterable, modelUsed } = await withFallback(
       (m) => {
-        // If falling back, trim history to reduce context window load
         const activeHistory = m !== preferredModelName ? history.slice(-6) : history;
         return geminiService.generateStream({
           message: enrichedMessage,
@@ -592,16 +527,10 @@ export const sendStream = asyncHandler(async (req, res) => {
       preferredModelName
     );
 
-    streamModelUsed = modelUsed;
     modelUsageTotal.inc({ model: modelUsed });
 
     const time = getTimeString();
-    const nonImages = filesArray.filter(f => getDocumentType(f.originalName, f.mimeType) !== 'image');
 
-    // skipAppend is true when this request originates from an edit-branch
-    // flow. The branch node (user message) already exists in MongoDB — skip
-    // creating a duplicate. Use parentMessageId as the ID of that existing
-    // user message so the bot response attaches as its child.
     let userMsgId;
     if (skipAppend) {
       userMsgId = parentMessageId;
@@ -632,7 +561,7 @@ export const sendStream = asyncHandler(async (req, res) => {
           // ── Phase 5: Fire-and-forget memory extraction ────────────────────
           // Explicit path ("remember that…") → guaranteed save, no LLM judgment gate.
           // Implicit path → best-effort LLM extraction, may return [].
-          if (await isExplicitSaveRequest(cleanMessage)) {
+          if (isExplicitSaveRequest(cleanMessage)) {
             const saveResult = await saveExplicitMemory({
               userId: userId.toString(),
               userMessage: cleanMessage,
@@ -687,7 +616,7 @@ export const sendStream = asyncHandler(async (req, res) => {
 });
 
 export const sendVision = asyncHandler(async (req, res) => {
-  const { message, sessionId, model, history: incomingHistory, imageUrl } = req.body;
+  const { message, sessionId, model, history: incomingHistory, imageUrl, parentMessageId } = req.body;
   const userId = req.user.id;
 
   if (!imageUrl) {
@@ -699,6 +628,13 @@ export const sendVision = asyncHandler(async (req, res) => {
     return res.status(400).json({ error: "Message content cannot be empty." });
   }
 
+  const sessionExists = await SessionStore.sessionExists(sessionId, userId);
+  const existingMessages = await SessionStore.getMessages(sessionId, userId);
+  const isFirstMessage = !sessionExists || existingMessages.length === 0;
+  if (!sessionExists) {
+    await SessionStore.createSession(sessionId, userId, "New Chat");
+  }
+
   if (incomingHistory !== undefined) {
     let parsedHistory = [];
     try {
@@ -707,13 +643,6 @@ export const sendVision = asyncHandler(async (req, res) => {
     if (Array.isArray(parsedHistory)) {
       await SessionStore.setMessages(sessionId, userId, parsedHistory);
     }
-  }
-
-  const sessionExists = await SessionStore.sessionExists(sessionId, userId);
-  const existingMessages = await SessionStore.getMessages(sessionId, userId);
-  const isFirstMessage = !sessionExists || existingMessages.length === 0;
-  if (!sessionExists) {
-    await SessionStore.createSession(sessionId, userId, "New Chat");
   }
 
   const preferredModelName = model || DEFAULT_MODEL;

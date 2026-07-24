@@ -106,13 +106,8 @@ describe("🔒 Authentication Integration Tests", () => {
         });
 
       expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty("accessToken");
-      expect(res.body.user.email).toBe("verify@example.com");
-
-      // Verify cookie is set with refreshToken
-      const cookies = res.headers["set-cookie"];
-      expect(cookies).toBeDefined();
-      expect(cookies[0]).toContain("refreshToken");
+      expect(res.body.success).toBe(true);
+      expect(res.body.message).toContain("Email verified successfully");
 
       // Check database status
       const dbUser = await User.findOne({ email: "verify@example.com" });
@@ -128,7 +123,7 @@ describe("🔒 Authentication Integration Tests", () => {
         });
 
       expect(res.status).toBe(400);
-      expect(res.body.error).toContain("Invalid or expired");
+      expect(res.body.error).toContain("Incorrect OTP");
     });
   });
 
@@ -168,7 +163,7 @@ describe("🔒 Authentication Integration Tests", () => {
         });
 
       expect(res.status).toBe(401);
-      expect(res.body.error).toContain("Invalid email or password");
+      expect(res.body.error).toContain("Incorrect password");
     });
   });
 });

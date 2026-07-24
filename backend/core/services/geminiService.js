@@ -3,7 +3,7 @@
 // reportSuccess / reportFailure are called after every request so the key manager
 // can advance the round-robin cursor and apply per-key cooldowns on failure.
 
-import { getModel } from "../config/gemini.js";
+import { getModelWithKey as getModel } from "../utils/keyManager.js";
 import { SYSTEM_PROMPT } from "../config/systemPrompt.js";
 import { logger } from "../utils/logger.js";
 

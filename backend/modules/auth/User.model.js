@@ -2,6 +2,7 @@
 
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 const userSchema = new mongoose.Schema(
   {
@@ -61,7 +62,7 @@ userSchema.methods.comparePassword = async function (plain) {
 
 // Generate a 6-digit OTP, hash it, and set expiry (15 minutes)
 userSchema.methods.generateOtp = async function () {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otp = crypto.randomInt(100000, 1000000).toString();
   this.emailOtp = await bcrypt.hash(otp, 10);
   this.emailOtpExpiry = new Date(Date.now() + 15 * 60 * 1000);
   return otp; // return plaintext to send in email
@@ -76,7 +77,7 @@ userSchema.methods.verifyOtp = async function (code) {
 
 // Generate a 6-digit OTP for password reset, hash it, and set expiry (15 minutes)
 userSchema.methods.generateResetOtp = async function () {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otp = crypto.randomInt(100000, 1000000).toString();
   this.resetOtp = await bcrypt.hash(otp, 10);
   this.resetOtpExpiry = new Date(Date.now() + 15 * 60 * 1000);
   return otp; // return plaintext to send in email

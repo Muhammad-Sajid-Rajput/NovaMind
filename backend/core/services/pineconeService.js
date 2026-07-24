@@ -22,14 +22,47 @@ const getIndex = () => {
   return pineconeIndex;
 };
 
+let cachedDimension = null;
+
+export const getPineconeDimension = async () => {
+  if (cachedDimension) return cachedDimension;
+  try {
+    const index = getIndex();
+    const stats = await index.describeIndexStats();
+    if (stats && stats.dimension) {
+      cachedDimension = stats.dimension;
+      logger.info(`Detected Pinecone index dimension: ${cachedDimension}`);
+      return cachedDimension;
+    }
+  } catch (err) {
+    logger.warn('Could not fetch Pinecone index stats, falling back to 786', { error: err.message });
+  }
+  return Number(process.env.VECTOR_DIMENSION) || 786;
+};
+
+const normalizeVectorDimension = (vector, targetDim) => {
+  if (!Array.isArray(vector)) return vector;
+  if (vector.length === targetDim) return vector;
+  if (vector.length < targetDim) {
+    return [...vector, ...new Array(targetDim - vector.length).fill(0)];
+  }
+  return vector.slice(0, targetDim);
+};
+
 // ── Upsert vectors ─────────────────────────────────
 export const upsertVectors = async (vectors) => {
   const index = getIndex();
-  
+  const targetDim = await getPineconeDimension();
+
+  const normalizedRecords = vectors.map(record => ({
+    ...record,
+    values: normalizeVectorDimension(record.values, targetDim),
+  }));
+
   // Pinecone upsert in batches of 100
   const BATCH_SIZE = 100;
-  for (let i = 0; i < vectors.length; i += BATCH_SIZE) {
-    const batch = vectors.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < normalizedRecords.length; i += BATCH_SIZE) {
+    const batch = normalizedRecords.slice(i, i + BATCH_SIZE);
     await index.upsert({ records: batch });
     logger.info(`Upserted batch ${Math.floor(i/BATCH_SIZE)+1}`, {
       count: batch.length,
@@ -45,9 +78,11 @@ export const searchVectors = async ({
   topK = 5,
 }) => {
   const index = getIndex();
+  const targetDim = await getPineconeDimension();
+  const normalizedQuery = normalizeVectorDimension(queryEmbedding, targetDim);
 
   const result = await index.query({
-    vector:          queryEmbedding,
+    vector:          normalizedQuery,
     topK,
     includeMetadata: true,
     filter: {

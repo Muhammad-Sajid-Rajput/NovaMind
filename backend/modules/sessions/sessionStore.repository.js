@@ -7,8 +7,6 @@ import Session from "./Session.model.js";
 import Message from "../messages/Message.model.js";
 import { logger } from "../../core/utils/logger.js";
 
-const MAX_MESSAGES_PER_SESSION = 200;
-
 export const SessionStore = {
 
   // ─── Sessions ──────────────────────────────────────────────────────────────
@@ -354,8 +352,20 @@ export const SessionStore = {
 
   setMessages: async (sessionId, userId, messages) => {
     await Message.deleteMany({ sessionId, userId });
-    if (messages.length > 0) {
-      const docs = messages.map((m) => ({ ...m, sessionId, userId }));
+    if (Array.isArray(messages) && messages.length > 0) {
+      const docs = messages.map((m) => ({
+        sender: m.sender,
+        message: String(m.message || ""),
+        time: m.time,
+        image: m.image,
+        file: m.file,
+        files: m.files,
+        parentMessageId: m.parentMessageId,
+        rootId: m.rootId,
+        activeChildId: m.activeChildId,
+        sessionId,
+        userId
+      }));
       await Message.insertMany(docs, { ordered: false });
     }
   },
@@ -417,20 +427,6 @@ export const SessionStore = {
       await Session.findOneAndUpdate({ _id: sessionId, userId }, { activeRootId: doc._id });
     }
 
-    // ── Immediate Safety Disable ──────────────────────────────────────────────
-    // Message-limit eviction is disabled to prevent accidental document deletion
-    // during tree branching operations.
-    /*
-    const activePath = await SessionStore.getActiveMessagePath(sessionId, userId);
-    if (activePath.length > MAX_MESSAGES_PER_SESSION) {
-      const oldest = activePath[0];
-      if (oldest) {
-        await Message.deleteOne({ _id: oldest._id });
-        logger.info(`Message limit reached for session ${sessionId}. Evicted oldest message from path.`);
-      }
-    }
-    */
-    // ─────────────────────────────────────────────────────────────────────────
     return doc;
   },
 

@@ -2,7 +2,8 @@
 
 import { SessionStore } from "../sessions/sessionStore.repository.js";
 import { asyncHandler } from "../../core/utils/asyncHandler.js";
-import { logger } from "../../core/utils/logger.js";
+import { logger }       from "../../core/utils/logger.js";
+import Memory           from "../memory/Memory.model.js";
 
 export const getMessages = asyncHandler(async (req, res) => {
   const { sessionId } = req.query;
@@ -18,7 +19,6 @@ export const clearMessages = asyncHandler(async (req, res) => {
 
   // Delete User Memories associated with this session
   try {
-    const Memory = (await import("../memory/Memory.model.js")).default;
     await Memory.deleteMany({ extractedFrom: sessionId, userId });
   } catch (err) {
     // Non-fatal — memory deletion should never block message clearing
@@ -34,6 +34,9 @@ export const createEditBranch = asyncHandler(async (req, res) => {
 
   if (!sessionId || !editedMessageId || !newText) {
     return res.status(400).json({ error: "Missing required fields" });
+  }
+  if (typeof newText === "string" && newText.length > 8000) {
+    return res.status(400).json({ error: "Message exceeds the 8000 character limit." });
   }
 
   const newNode = await SessionStore.createEditBranch({
