@@ -1,19 +1,49 @@
-// NovaMind — ModelSelector.jsx — Responsive
-
 import { useState, useRef, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { useChatContext } from "../context/ChatContext.jsx";
 import { MODELS } from "../../../core/constants/index.js";
+import { api } from "../../../config/api.js";
 
 function ModelSelector({ compact = false, dropdownPosition = "up" }) {
   const {
     selectedModel,
     setSelectedModel,
-    fallbackUsed
+    fallbackUsed,
+    cooledModels
   } = useChatContext();
 
   const [isOpen, setIsOpen] = useState(false);
+  const [serverCooled, setServerCooled] = useState({});
+  const [now, setNow] = useState(Date.now());
   const dropdownRef = useRef(null);
+
+  // Client-side timer for live countdowns
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Poll /models/status every 15 seconds
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStatus = async () => {
+      try {
+        const data = await api.utils.modelStatus();
+        if (isMounted && data?.models) {
+          setServerCooled(data.models);
+        }
+      } catch {
+        /* ignore error */
+      }
+    };
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 15000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -25,6 +55,24 @@ function ModelSelector({ compact = false, dropdownPosition = "up" }) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
+
+  const getCooldownInfo = (modelId) => {
+    const opt = cooledModels[modelId];
+    const srv = serverCooled[modelId];
+
+    let expiresAt = null;
+    if (opt?.cooldownExpiresAt) {
+      expiresAt = new Date(opt.cooldownExpiresAt).getTime();
+    } else if (srv?.available === false && srv?.cooldownExpiresAt) {
+      expiresAt = new Date(srv.cooldownExpiresAt).getTime();
+    }
+
+    if (expiresAt && expiresAt > now) {
+      const seconds = Math.ceil((expiresAt - now) / 1000);
+      return { isDisabled: true, seconds };
+    }
+    return { isDisabled: false, seconds: 0 };
+  };
 
   const currentModel = MODELS.find((m) => m.id === selectedModel) || MODELS[0];
 
@@ -60,38 +108,61 @@ function ModelSelector({ compact = false, dropdownPosition = "up" }) {
           style={{ borderColor: "var(--color-border)" }}
           role="menu"
         >
-          {MODELS.map((m) => (
-            <button
-              key={m.id}
-              className={`flex flex-col px-3 py-2 text-left text-xs cursor-pointer transition-colors w-full border-none bg-transparent hover:bg-surface-hover ${
-                m.id === selectedModel
-                  ? "bg-primary-light text-primary hover:bg-primary-light"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-              onClick={() => {
-                setSelectedModel(m.id);
-                setIsOpen(false);
-              }}
-              role="menuitem"
-            >
-              <div className="flex items-center justify-between w-full font-semibold">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: m.color }} />
-                  <span>{m.label}</span>
+          {MODELS.map((m) => {
+            const { isDisabled, seconds } = getCooldownInfo(m.id);
+            const isSelected = m.id === selectedModel;
+
+            return (
+              <button
+                key={m.id}
+                disabled={isDisabled}
+                className={`flex flex-col px-3 py-2 text-left text-xs transition-colors w-full border-none bg-transparent ${
+                  isDisabled
+                    ? "opacity-50 cursor-not-allowed"
+                    : isSelected
+                    ? "bg-primary-light text-primary hover:bg-primary-light cursor-pointer"
+                    : "text-text-secondary hover:text-text-primary hover:bg-surface-hover cursor-pointer"
+                }`}
+                onClick={() => {
+                  if (isDisabled) return;
+                  setSelectedModel(m.id);
+                  setIsOpen(false);
+                }}
+                role="menuitem"
+                title={isDisabled ? `Quota reached — resets in ${seconds}s` : undefined}
+              >
+                <div className="flex items-center justify-between w-full font-semibold">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${isDisabled ? "bg-text-muted opacity-50" : ""}`}
+                      style={isDisabled ? undefined : { backgroundColor: m.color }}
+                    />
+                    <span>{m.label}</span>
+                  </div>
+                  {!compact && (
+                    <span
+                      className={`text-[8px] px-1 py-0.2 rounded font-bold uppercase ${
+                        isDisabled
+                          ? "bg-surface-hover text-text-muted"
+                          : isSelected
+                          ? "bg-primary text-white"
+                          : "bg-surface-hover text-text-secondary"
+                      }`}
+                    >
+                      {isDisabled ? "Cooled" : m.badge}
+                    </span>
+                  )}
                 </div>
                 {!compact && (
-                  <span
-                    className={`text-[8px] px-1 py-0.2 rounded font-bold uppercase ${
-                      m.id === selectedModel ? "bg-primary text-white" : "bg-surface-hover text-text-secondary"
-                    }`}
-                  >
-                    {m.badge}
+                  <span className="text-[10px] text-text-muted mt-0.5 pl-3 truncate w-full">
+                    {isDisabled
+                      ? `Quota reached — resets in ${seconds}s`
+                      : m.description}
                   </span>
                 )}
-              </div>
-              {!compact && <span className="text-[10px] text-text-muted mt-0.5 pl-3 truncate w-full">{m.description}</span>}
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
@@ -99,3 +170,4 @@ function ModelSelector({ compact = false, dropdownPosition = "up" }) {
 }
 
 export default ModelSelector;
+

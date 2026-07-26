@@ -3,7 +3,7 @@
 import generateUniqueKey from "../../core/utils/password.js";
 import { SessionStore } from "../sessions/sessionStore.repository.js";
 import { asyncHandler } from "../../core/utils/asyncHandler.js";
-import { ALLOWED_MODELS } from "../chat/utils/modelFallback.js";
+import { ALLOWED_MODELS, getModelStatus } from "../chat/utils/modelFallback.js";
 import { getKeyStats } from "../../core/utils/keyManager.js";
 
 export const generatePassword = asyncHandler(async (req, res) => {
@@ -28,3 +28,9 @@ export const getStatus = asyncHandler(async (req, res) => {
     cpuUsage: process.cpuUsage()
   });
 });
+
+export const getModelsStatus = asyncHandler(async (req, res) => {
+  const models = await getModelStatus();
+  res.json({ models });
+});
+

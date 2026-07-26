@@ -14,6 +14,7 @@ export const ALLOWED_MODELS = [
   "gemini-2.5-flash",
 ];
 
+
 // Telemetry tracker (in-memory — for the current process lifetime only)
 const telemetry = {};
 for (const m of ALLOWED_MODELS) {
@@ -40,6 +41,47 @@ export const getCooldownStatus = async () => {
     return status;
   } catch {
     return {};
+  }
+};
+
+export const getModelStatus = async () => {
+  try {
+    const now = new Date();
+    const records = await ModelCooldown.find({
+      expiresAt: { $gt: now },
+    }).lean();
+
+    const cooldownMap = {};
+    records.forEach((r) => {
+      cooldownMap[r.modelName] = r;
+    });
+
+    const status = {};
+    ALLOWED_MODELS.forEach((m) => {
+      const rec = cooldownMap[m];
+      if (rec) {
+        status[m] = {
+          available: false,
+          cooldownExpiresAt: rec.expiresAt,
+          reason: rec.reason || null,
+        };
+      } else {
+        status[m] = {
+          available: true,
+          cooldownExpiresAt: null,
+          reason: null,
+        };
+      }
+    });
+
+    return status;
+  } catch (err) {
+    logger.error("Failed to fetch model status", { error: err.message });
+    const status = {};
+    ALLOWED_MODELS.forEach((m) => {
+      status[m] = { available: true, cooldownExpiresAt: null, reason: null };
+    });
+    return status;
   }
 };
 
@@ -86,24 +128,28 @@ const setCooldown = async (modelName, errorStatus) => {
   }
 };
 
-// ── withRetry — unchanged from Phase 4 ────────────────────────────────────────
+// ── withRetry — fast fail on 429 ──────────────────────────────────────────────
 export const withRetry = async (fn, retries = 2, delayMs = 200) => {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       return await fn();
     } catch (err) {
-      const status      = err.status || (err.response && err.response.status);
-      const code        = err.code;
-      const isRetryable = [500, 502, 503, 504, 429].includes(status) ||
+      const status = err.status || (err.response && err.response.status);
+      const code   = err.code;
+
+      if (status === 429) {
+        throw err; // Quota exceeded: throw immediately on 1st attempt, no retry/backoff
+      }
+
+      const isRetryable = [500, 502, 503, 504].includes(status) ||
                           ['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND'].includes(code);
       const isLast      = attempt === retries - 1;
 
       if (isRetryable && !isLast) {
-        const wait = status === 429 ? Math.max(100, delayMs / 2) : delayMs;
         logger.warn(
-          `[Retry] Attempt ${attempt + 1}/${retries} failed (${status || code}). Retrying in ${wait}ms...`
+          `[Retry] Attempt ${attempt + 1}/${retries} failed (${status || code}). Retrying in ${delayMs}ms...`
         );
-        await new Promise((r) => setTimeout(r, wait));
+        await new Promise((r) => setTimeout(r, delayMs));
         delayMs *= 1.5;
         continue;
       }
@@ -159,7 +205,7 @@ export const withFallback = async (fn, preferredModel) => {
       const isRequest400 = status >= 400 && status < 500 && status !== 429;
 
       if (!isRequest400) {
-        await setCooldown(name, status);
+        setCooldown(name, status).catch(() => {}); // Fire-and-forget background write
       }
 
       const isLastModel = i === chain.length - 1;
@@ -181,3 +227,4 @@ export const withFallback = async (fn, preferredModel) => {
   }
   throw new Error("All models currently unavailable.");
 };
+

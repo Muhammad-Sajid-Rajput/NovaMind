@@ -259,5 +259,7 @@ export const api = {
   utils: {
     password: (length) => post("/password", { length }),
     status:   ()       => get("/status"),
+    modelStatus: ()    => get("/models/status"),
   },
 };
+

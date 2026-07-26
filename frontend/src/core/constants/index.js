@@ -28,6 +28,14 @@ export const MODELS = [
     color: "#6366f1"
   },
   {
+    id: "gemini-3-flash",
+    label: "Gemini 3.0 Flash",
+    badge: "Balanced",
+    description: "Fast and reliable, balanced performance",
+    rpd: "1500 req/day",
+    color: "#3b82f6"
+  },
+  {
     id: "gemini-2.5-flash",
     label: "Gemini 2.5 Flash",
     badge: "Powerful",
@@ -36,6 +44,7 @@ export const MODELS = [
     color: "#8b5cf6"
   }
 ];
+
 
 export const DEFAULT_MODEL_ID = MODELS[0].id;
 

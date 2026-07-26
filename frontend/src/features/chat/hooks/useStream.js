@@ -1,8 +1,6 @@
-// NovaMind — useStream.js — Media Upload
-
 import { useState, useRef, useEffect } from "react";
 import { api } from "../../../config/api.js";
-import { DEFAULT_MODEL_ID } from "../../../core/constants/index.js";
+import { DEFAULT_MODEL_ID, MODELS } from "../../../core/constants/index.js";
 
 const PASSWORD_COMMAND = "give me a unique key or password";
 
@@ -16,6 +14,7 @@ export function useStream({
   setActiveModel,
   setModelStatus,
   setFallbackUsed,
+  markModelCooled,
   onSessionNamed,
   editingMessageId,
   chatMessages,
@@ -32,6 +31,8 @@ export function useStream({
   const timerRef = useRef(null);
 
   const isAbortedRef = useRef(false);
+  const latestRequestIdRef = useRef(null);
+
 
   // Cleanup throttled timer on unmount
   useEffect(() => {
@@ -78,8 +79,12 @@ export function useStream({
     const trimmedInput = inputText ? inputText.trim() : "";
     if ((!trimmedInput && !file && (!files || files.length === 0)) || isLoading || countdown > 0) return;
 
+    const requestId = crypto.randomUUID();
+    latestRequestIdRef.current = requestId;
+
     let activeSessionId = sessionId;
     setIsLoading(true);
+
 
     // ── Background re-sync helper ─────────────────────────────────────────────
     // After every AI response, replace local optimistic state with the
@@ -271,12 +276,13 @@ export function useStream({
           skipAppend: !!skipAppend
         });
 
-        if (data.model) {
+        if (data.model && latestRequestIdRef.current === requestId) {
           setActiveModel(data.model);
           if (data.model !== model) {
             setFallbackUsed(data.model);
-            if (setSelectedModel) {
-              setSelectedModel(data.model);
+            if (markModelCooled) {
+              const errStatus = data.status || 429;
+              markModelCooled(model, errStatus === 429 ? 30000 : 60000);
             }
           }
         }
@@ -307,12 +313,14 @@ export function useStream({
       } catch (err) {
         const status = err.status || 500;
         let errMsg = "Failed to get a response from the AI. Please try again.";
+        const altModel = MODELS.find((m) => m.id !== model) || MODELS[0];
         if (status === 503) {
           errMsg = "The AI model is currently busy. Trying backup model... Please resend your message.";
         } else if (status === 429) {
-          errMsg = "Daily limit reached for this model. Switch to Gemini 2.5 Flash Lite for 1500 requests/day.";
+          errMsg = `Daily limit reached for this model. You can switch to ${altModel.label} (${altModel.rpd}).`;
           setCountdown(err.data?.retryAfter || 900);
         }
+
         const errObj = {
           id: loadingId,
           sender: "robot",
@@ -456,12 +464,13 @@ export function useStream({
               if (parsed.text) {
                 onChunk(parsed.text);
               }
-              if (parsed.model) {
+              if (parsed.model && latestRequestIdRef.current === requestId) {
                 setActiveModel(parsed.model);
                 if (parsed.model !== model) {
                   setFallbackUsed(parsed.model);
-                  if (setSelectedModel) {
-                    setSelectedModel(parsed.model);
+                  if (markModelCooled) {
+                    const errStatus = parsed.status || 429;
+                    markModelCooled(model, errStatus === 429 ? 30000 : 60000);
                   }
                 }
                 setChatMessages((prev) => {
@@ -533,11 +542,13 @@ export function useStream({
       } else {
         const status = err.status || 500;
         let errMsg = "Failed to get a response from the AI. Please try again.";
+        const altModel = MODELS.find((m) => m.id !== model) || MODELS[0];
         if (status === 503) {
           errMsg = "The AI model is currently busy. Trying backup model... Please resend your message.";
         } else if (status === 429) {
-          errMsg = "Daily limit reached for this model. Switch to Gemini 3.1 Flash Lite for 500 requests/day.";
+          errMsg = `Daily limit reached for this model. You can switch to ${altModel.label} (${altModel.rpd}).`;
         }
+
         const errObj = {
           id: loadingId,
           sender: "robot",
