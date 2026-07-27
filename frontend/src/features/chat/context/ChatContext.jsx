@@ -34,8 +34,10 @@ export const ChatProvider = ({ children }) => {
     return MODELS.some((m) => m.id === saved) ? saved : "gemini-3.5-flash";
   });
   const [activeModel, setActiveModel] = useState(() => selectedModel);
+  const [modelStatus, setModelStatus] = useState("working");
   const [fallbackUsed, setFallbackUsed] = useState(null);
   const [cooledModels, setCooledModels] = useState({});
+
 
   const markModelCooled = (modelId, durationMs = 30000) => {
     const expiresAt = new Date(Date.now() + durationMs).toISOString();
