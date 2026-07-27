@@ -9,16 +9,17 @@ const MEMORY_MODEL = 'gemini-3.1-flash-lite';
 const confirm = process.argv.includes("--confirm");
 
 const buildBulkReconciliationPrompt = (memories) => `
-You are a memory reconciliation assistant. Analyze the user's current list of memories below. Identify any duplicate, redundant, or contradictory memories, and suggest updates or deletions to make the list clean, accurate, and consistent.
+You are an expert memory reconciliation assistant. Analyze the user's current list of memories below. Identify any duplicate, redundant, or contradictory memories, and suggest updates or deletions to make the list clean, accurate, and consistent.
 
 Memories:
 ${memories.map((m, i) => `${i}: [ID: ${m._id}] "${m.content}"`).join('\n')}
 
-Rules:
-- Contradictory/Redundant entries: If memory A is updated or contradicted by memory B, keep the newer, more accurate one (usually higher index/newer) and delete the outdated one. Or, merge them into a single positive-phrased fact.
-- Redundancy/Duplicates: If two memories say the same thing, suggest deleting one of them (keep the better phrased one).
-- Standalone Negations: If any memory is phrased as a negation (e.g. "No longer prefers X", "does not play chess"), suggest deleting it.
-- Non-personal/Noise: If any memory is noise, suggest deleting it.
+Critical Reasoning Rules:
+1. Identify if two or more memories describe the SAME underlying real-world data point (e.g. a date, graduation timeline, degree, job title, role, location, tool preference), regardless of surface phrasing.
+2. If two memories make conflicting claims about the same attribute (e.g. "Expected graduation date is December 2026" vs "Enrolled from Dec 2022 to May 2026"), keep/prefer the NEWER or more specific one (higher index) and suggest deleting or replacing the outdated memory.
+3. If a memory is a subset of another fuller memory (e.g. "MERN developer" vs "MERN developer and AI Integration Specialist"), merge into the fuller version or delete the subset.
+4. Standalone Negations: If any memory is phrased as a negation with no positive fact (e.g. "No longer prefers X"), suggest deleting it.
+5. Non-personal/Noise: Delete non-personal noise.
 
 Return ONLY a valid JSON object matching this schema:
 {
@@ -36,6 +37,7 @@ If no actions are needed, return:
 
 Return ONLY valid JSON, no markdown, no explanation.
 `.trim();
+
 
 const run = async () => {
   const mongoUri = process.env.MONGODB_URI || "mongodb://localhost:27017/novamind";

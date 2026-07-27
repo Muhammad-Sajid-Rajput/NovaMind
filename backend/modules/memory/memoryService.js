@@ -68,21 +68,32 @@ ${assistantReply ? `Assistant's reply: "${assistantReply}"` : ""}
 
 // ── Reconciliation Prompt ────────────────────────────────────────────────────
 const buildReconciliationPrompt = (newFact, existing) => `
-You are a memory reconciliation assistant. Given the user's EXISTING memories and a NEW fact just extracted, determine the correct action.
+You are an expert memory reconciliation assistant. Given the user's EXISTING memories and a NEW fact just extracted, determine the correct action.
 
 Existing memories:
 ${existing.map((m, i) => `${i}: ${m.content}`).join('\n')}
 
 New fact: "${newFact}"
 
-Rules:
-- If the new fact contradicts, updates, replaces, or negates an existing memory (e.g. changed preference, corrected info, 'no longer X', 'actually it's Y now'), return {"action": "replace", "replaceIndex": <index>, "newContent": "<cleaned positive-phrased fact>"}
-- If the new fact is entirely new and unrelated to any existing memory, return {"action": "add", "newContent": "<cleaned fact>"}
-- If the new fact is a pure negation with no replacement stated (e.g. 'I don't like Rust anymore' with no mention of what they prefer instead), return {"action": "delete", "replaceIndex": <index>}
-- If the new fact is already effectively covered by an existing memory, return {"action": "skip"}
+Critical Reasoning Rules:
+1. Identify if the new fact and any existing memory describe the SAME underlying real-world data point (e.g. a date, graduation timeline, degree, job title, role, location, tool preference).
+2. Look past surface phrasing differences. If two statements make conflicting claims about the same underlying attribute, treat them as a CONFLICT and prefer/trust the NEW fact (Action: "replace").
+3. If the new fact is a fuller, richer version of an existing memory (e.g. "MERN developer" vs "MERN developer and AI Specialist"), replace the older subset memory (Action: "replace").
+4. If the new fact is a pure negation with no replacement stated (e.g. "I don't play chess anymore"), delete the contradicted memory (Action: "delete").
+5. If the new fact is already covered or duplicated by an existing memory, skip it (Action: "skip").
 
-Return ONLY valid JSON, no markdown, no explanation.
+Examples:
+- Conflict: Existing "Expected graduation date is December 2026" vs New "Degree in CS from Dec 2022 to May 2026" -> {"action": "replace", "replaceIndex": 0, "newContent": "Degree in CS from Dec 2022 to May 2026"}
+- Superset: Existing "Profession: MERN developer" vs New "Profession: MERN developer and AI Integration Specialist" -> {"action": "replace", "replaceIndex": 0, "newContent": "Profession: MERN developer and AI Integration Specialist"}
+- Changed Preference: Existing "Lives in Lahore" vs New "Lives in Karachi now" -> {"action": "replace", "replaceIndex": 0, "newContent": "Lives in Karachi"}
+
+Return ONLY valid JSON:
+- Replace: {"action": "replace", "replaceIndex": <index>, "newContent": "<cleaned positive fact>"}
+- Add: {"action": "add", "newContent": "<cleaned fact>"}
+- Delete: {"action": "delete", "replaceIndex": <index>}
+- Skip: {"action": "skip"}
 `.trim();
+
 
 // ── Explicit save trigger patterns ───────────────────────────────────────────
 // Narrow and safe — false positives just mean an extra clean-and-save (cheap).
@@ -274,12 +285,12 @@ export const extractAndSaveMemories = ({ userId, userMessage, assistantReply, se
     try {
       if (!shouldIncludeMemories(userMessage)) return;
 
-      // Fetch existing memories to avoid duplicates (limit to recent 50)
+      // Fetch all existing memories to guarantee complete reconciliation coverage
       const existing = await Memory.find({ userId })
         .sort({ createdAt: -1 })
         .select('content')
-        .limit(50)
         .lean();
+
 
       const { model, reportSuccess, reportFailure } = getModelWithKey(MEMORY_MODEL);
       let result;
@@ -357,8 +368,8 @@ export const saveExplicitMemory = async ({ userId, userMessage, assistantReply, 
     const existing = await Memory.find({ userId })
       .sort({ createdAt: -1 })
       .select('content')
-      .limit(50)
       .lean();
+
 
     let cleanedFact = null;
 
@@ -417,9 +428,9 @@ export const getUserMemoriesForPrompt = async (userId) => {
   try {
     const memories = await Memory.find({ userId })
       .sort({ createdAt: -1 })
-      .limit(30)
       .select('content')
       .lean();
+
 
     if (memories.length === 0) return '';
 
