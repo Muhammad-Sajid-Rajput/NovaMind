@@ -7,6 +7,7 @@ import { asyncHandler }                  from "../../core/utils/asyncHandler.js"
 import { sendVerificationEmail, sendPasswordResetEmail } from "../../core/services/emailService.js";
 import { logger }                        from "../../core/utils/logger.js";
 import { setRefreshCookie, clearRefreshCookie } from "./cookieHelper.js";
+import { validatePassword }              from "../../core/utils/password.js";
 
 // ─── Token Helpers ────────────────────────────────────────────────────────────
 
@@ -30,8 +31,9 @@ export const register = asyncHandler(async (req, res) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ error: "Please enter a valid email address." });
   }
-  if (password.length < 8) {
-    return res.status(400).json({ error: "Password must be at least 8 characters long." });
+  const passwordErr = validatePassword(password);
+  if (passwordErr) {
+    return res.status(400).json({ error: passwordErr });
   }
 
   const normalizedEmail = email.toLowerCase().trim();
@@ -299,8 +301,9 @@ export const resetPassword = asyncHandler(async (req, res) => {
   if (!email || !code || !newPassword) {
     return res.status(400).json({ error: "Please fill in all required fields." });
   }
-  if (newPassword.length < 8) {
-    return res.status(400).json({ error: "Password must be at least 8 characters long." });
+  const passwordErr = validatePassword(newPassword);
+  if (passwordErr) {
+    return res.status(400).json({ error: passwordErr });
   }
 
   const user = await User.findOne({ email: email.toLowerCase().trim() });

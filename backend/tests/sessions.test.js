@@ -30,7 +30,7 @@ describe("💬 Session Management Integration Tests", () => {
     // Create a mock verified user
     testUser = new User({
       email:        "sessiontester@example.com",
-      passwordHash: "SecurePassword123",
+      passwordHash: "SecurePassword123!",
       name:         "Session Tester",
       isEmailVerified: true
     });

@@ -10,6 +10,7 @@ import Memory           from "../memory/Memory.model.js";
 import { deleteUserVectors }                            from "../../core/services/pineconeService.js";
 import { clearRefreshCookie }                           from "./cookieHelper.js";
 import { deleteAllUserDocuments, deleteCloudinaryAssetsForMessages } from "../upload/cleanupHelper.js";
+import { validatePassword }                             from "../../core/utils/password.js";
 
 // ─── PATCH /api/auth/change-password ─────────────────────────────────────────
 export const changePassword = asyncHandler(async (req, res) => {
@@ -18,8 +19,9 @@ export const changePassword = asyncHandler(async (req, res) => {
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ error: "Please provide both current and new password." });
   }
-  if (newPassword.length < 8) {
-    return res.status(400).json({ error: "New password must be at least 8 characters." });
+  const passwordErr = validatePassword(newPassword);
+  if (passwordErr) {
+    return res.status(400).json({ error: passwordErr });
   }
   if (currentPassword === newPassword) {
     return res.status(400).json({ error: "New password must be different from your current password." });

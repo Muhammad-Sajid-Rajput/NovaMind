@@ -260,6 +260,10 @@ function SettingsPanel() {
     if (!currentPassword) return "Please enter your current password.";
     if (!newPassword) return "Please enter a new password.";
     if (newPassword.length < 8) return "New password must be at least 8 characters.";
+    if (!/[A-Z]/.test(newPassword)) return "New password must contain at least one uppercase letter.";
+    if (!/[a-z]/.test(newPassword)) return "New password must contain at least one lowercase letter.";
+    if (!/[0-9]/.test(newPassword)) return "New password must contain at least one number.";
+    if (!/[^A-Za-z0-9]/.test(newPassword)) return "New password must contain at least one special character.";
     if (newPassword === currentPassword) return "New password must be different from current password.";
     if (newPassword !== confirmNewPassword) return "New passwords do not match.";
     return null;

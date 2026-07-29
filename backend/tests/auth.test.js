@@ -45,7 +45,7 @@ describe("🔒 Authentication Integration Tests", () => {
         .post("/api/auth/register")
         .send({
           email:    "testuser@example.com",
-          password: "SecurePassword123",
+          password: "SecurePassword123!",
           name:     "Test User",
         });
 
@@ -62,6 +62,19 @@ describe("🔒 Authentication Integration Tests", () => {
       expect(verificationCode).toMatch(/^\d{6}$/);
     });
 
+    it("should reject password without special character", async () => {
+      const res = await request(app)
+        .post("/api/auth/register")
+        .send({
+          email:    "nospecial@example.com",
+          password: "SecurePassword123",
+          name:     "Test User",
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain("special character");
+    });
+
     it("should reject duplicate email registration for verified accounts", async () => {
       // Manually verify user for the sake of this test
       await User.updateOne({ email: "testuser@example.com" }, { isEmailVerified: true });
@@ -70,7 +83,7 @@ describe("🔒 Authentication Integration Tests", () => {
         .post("/api/auth/register")
         .send({
           email:    "testuser@example.com",
-          password: "DifferentPassword123",
+          password: "DifferentPassword123!",
           name:     "Test User",
         });
 
@@ -90,7 +103,7 @@ describe("🔒 Authentication Integration Tests", () => {
         .post("/api/auth/register")
         .send({
           email:    "verify@example.com",
-          password: "SecurePassword123",
+          password: "SecurePassword123!",
           name:     "Verify User",
         });
     });
@@ -135,7 +148,7 @@ describe("🔒 Authentication Integration Tests", () => {
         .post("/api/auth/register")
         .send({
           email:    "login@example.com",
-          password: "LoginPassword123",
+          password: "LoginPassword123!",
           name:     "Login User",
         });
       await User.updateOne({ email: "login@example.com" }, { isEmailVerified: true });
@@ -146,7 +159,7 @@ describe("🔒 Authentication Integration Tests", () => {
         .post("/api/auth/login")
         .send({
           email:    "login@example.com",
-          password: "LoginPassword123",
+          password: "LoginPassword123!",
         });
 
       expect(res.status).toBe(200);
@@ -159,7 +172,7 @@ describe("🔒 Authentication Integration Tests", () => {
         .post("/api/auth/login")
         .send({
           email:    "login@example.com",
-          password: "WrongPassword123",
+          password: "WrongPassword123!",
         });
 
       expect(res.status).toBe(401);
