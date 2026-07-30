@@ -100,7 +100,7 @@ function MessageActions({
       <div className="flex items-center justify-end gap-1 mt-0.5 text-xs text-text-muted select-none">
         <div className={`flex items-center gap-1 transition-opacity duration-150 ${isTouched
             ? "opacity-100"
-            : "opacity-0 md:group-hover:opacity-100 focus-within:opacity-100"
+            : "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100"
           }`}>
           <span className="text-[11px] text-text-muted/60 font-sans">{displayTime}</span>
           <div className="flex items-center gap-0.5">
@@ -146,7 +146,7 @@ function MessageActions({
     <div className="flex items-center gap-1 mt-0.5 text-xs text-text-muted select-none">
       <div className={`flex items-center gap-0.5 transition-opacity duration-150 ${isTouched
           ? "opacity-100"
-          : "opacity-0 md:group-hover:opacity-100 focus-within:opacity-100"
+          : "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100"
         }`}>
         <button
           className="w-5.5 h-5.5 flex items-center justify-center bg-transparent border-none text-text-muted hover:text-text-primary hover:bg-surface-hover cursor-pointer rounded transition-colors duration-150 relative focus:outline-none p-0 m-0"
@@ -191,7 +191,7 @@ function MessageActions({
       {model && (
         <span className={`text-[11px] text-text-muted/60 font-sans transition-opacity duration-150 ${isTouched
             ? "opacity-100"
-            : "opacity-0 md:group-hover:opacity-100 focus-within:opacity-100"
+            : "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100"
           }`}>
           {MODELS_LABELS[model] || model}
         </span>
