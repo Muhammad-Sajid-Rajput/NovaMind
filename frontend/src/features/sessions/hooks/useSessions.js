@@ -63,7 +63,7 @@ export function useSessions(setChatMessages, chatMessages) {
     }
 
     syncMessages();
-  }, [currentSessionId, setChatMessages]);
+  }, [currentSessionId, sessionsList, setChatMessages]);
 
   useEffect(() => {
     async function loadSessions() {

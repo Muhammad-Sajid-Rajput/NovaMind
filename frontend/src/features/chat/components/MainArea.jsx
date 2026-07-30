@@ -12,6 +12,7 @@ import { useChatContext } from "../context/ChatContext.jsx";
 function MainArea() {
   const {
     currentSessionId,
+    sessionsList,
     chatMessages,
     isShortcutsOpen,
     setIsShortcutsOpen,
@@ -23,7 +24,8 @@ function MainArea() {
   } = useChatContext();
 
   const currentMessages = chatMessages[currentSessionId] || [];
-  const hasMessages = currentMessages.length > 0;
+  const isSavedSession = sessionsList.some((s) => s.id === currentSessionId);
+  const showWelcome = currentMessages.length === 0 && !isSavedSession;
 
   return (
     <main className="flex flex-col h-full relative overflow-hidden bg-background flex-1">
@@ -79,10 +81,10 @@ function MainArea() {
       <ChatMessages />
 
       {/* Message input bar */}
-      {hasMessages && <ChatInput />}
+      {!showWelcome && <ChatInput />}
 
       {/* Full-screen Welcome Screen */}
-      {!hasMessages && <WelcomeScreen />}
+      {showWelcome && <WelcomeScreen />}
 
       {/* Modals & panels rendering */}
       {isSettingsOpen && <SettingsPanel />}

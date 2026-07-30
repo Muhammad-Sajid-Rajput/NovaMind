@@ -35,6 +35,71 @@ const formatBytes = (bytes) => {
   return `${(bytes/1024/1024).toFixed(1)} MB`;
 };
 
+function UserMessageContent({ messageId, renderUserText }) {
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  const [maxHeightPx, setMaxHeightPx] = useState(null);
+  const textRef = useRef(null);
+
+  useEffect(() => {
+    const el = textRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const computedStyle = window.getComputedStyle(el);
+      let lineHeight = parseFloat(computedStyle.lineHeight);
+      if (isNaN(lineHeight) || lineHeight <= 0) {
+        const fontSize = parseFloat(computedStyle.fontSize) || 14.5;
+        lineHeight = fontSize * 1.5;
+      }
+      const fiveLinesHeight = Math.ceil(lineHeight * 5);
+      const isTooTall = el.scrollHeight > fiveLinesHeight + 2;
+
+      setOverflows(isTooTall);
+      setMaxHeightPx(fiveLinesHeight);
+    };
+
+    measure();
+
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const contentId = `user-msg-${messageId}`;
+
+  return (
+    <div className="relative flex flex-col gap-1 min-w-0 w-full">
+      <div
+        id={contentId}
+        style={{
+          maxHeight: overflows && !expanded && maxHeightPx ? `${maxHeightPx}px` : "none",
+        }}
+        className={`text-[14.5px] leading-relaxed select-text whitespace-pre-wrap wrap-break-word relative transition-[max-height] duration-250 ease-in-out motion-reduce:transition-none ${
+          overflows && !expanded ? "overflow-hidden" : ""
+        }`}
+      >
+        <span ref={textRef} className="block w-full">
+          {renderUserText()}
+        </span>
+      </div>
+
+      {overflows && (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={contentId}
+          onClick={(e) => { e.stopPropagation(); setExpanded(v => !v); }}
+          className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-white/80 hover:text-white bg-transparent border-none p-0 cursor-pointer self-start select-none"
+        >
+          <span>{expanded ? "See less" : "See more"}</span>
+          <Icon icon={expanded ? "mdi:chevron-up" : "mdi:chevron-down"} className="text-base shrink-0" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ChatMessage({
   id,
   message,
@@ -275,9 +340,7 @@ function ChatMessage({
               })}
               {message && message.trim() !== "" && (
                 <div ref={userBubbleRef} className="relative p-3.5 px-4 rounded-[18px_18px_4px_18px] bg-user-bubble text-white shadow-xs flex flex-col gap-1.5 transition-all duration-300 w-fit max-w-full min-w-0 group self-end">
-                  <span className="block max-w-full text-[14.5px] leading-relaxed wrap-break-word font-sans select-text whitespace-pre-wrap">
-                    {renderUserText()}
-                  </span>
+                  <UserMessageContent messageId={id} message={message} renderUserText={renderUserText} />
                 </div>
               )}
             </div>
